@@ -1,6 +1,7 @@
 //! CLI library mapping for DigitalNZ query parsers.
 
 use clap::{Parser, Subcommand, ValueEnum};
+use std::{env, fs, path::PathBuf};
 
 #[derive(Parser, Debug)]
 #[command(name = "dnz", author, version, about = "DigitalNZ API Integration CLI")]
@@ -81,6 +82,9 @@ pub enum Commands {
 
     /// Verification check.
     Ping,
+
+    /// Check local workspace prerequisites and common Windows path issues.
+    Doctor,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
@@ -100,4 +104,99 @@ pub fn parse_bbox(s: &str) -> Result<[f64; 4], String> {
     let s_val = parts[2].parse::<f64>().map_err(|e| e.to_string())?;
     let e = parts[3].parse::<f64>().map_err(|e| e.to_string())?;
     Ok([n, w, s_val, e])
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticCheck {
+    pub name: &'static str,
+    pub ok: bool,
+    pub detail: String,
+}
+
+pub fn workspace_diagnostics() -> Vec<DiagnosticCheck> {
+    vec![
+        check_workspace_path(),
+        check_target_write(),
+        check_api_key(),
+        check_path_tool("cargo"),
+        check_path_tool("rustc"),
+        check_path_tool("link.exe"),
+    ]
+}
+
+fn check_workspace_path() -> DiagnosticCheck {
+    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let display = cwd.display().to_string();
+    let has_space = display.contains(' ');
+    let is_onedrive = display.to_ascii_lowercase().contains("onedrive");
+    DiagnosticCheck {
+        name: "workspace_path",
+        ok: !has_space,
+        detail: if has_space {
+            format!("path contains spaces: {display}")
+        } else if is_onedrive {
+            format!("path is under OneDrive: {display}")
+        } else {
+            display
+        },
+    }
+}
+
+fn check_target_write() -> DiagnosticCheck {
+    let target_dir = env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("target"));
+    let probe_dir = target_dir.join(".dnz-doctor");
+    let probe_file = probe_dir.join("write-test.tmp");
+    let write_result = fs::create_dir_all(&probe_dir)
+        .and_then(|_| fs::write(&probe_file, b"ok"))
+        .and_then(|_| fs::remove_file(&probe_file));
+    DiagnosticCheck {
+        name: "target_write",
+        ok: write_result.is_ok(),
+        detail: write_result
+            .map(|_| format!("writable: {}", target_dir.display()))
+            .unwrap_or_else(|err| format!("not writable: {} ({err})", target_dir.display())),
+    }
+}
+
+fn check_api_key() -> DiagnosticCheck {
+    let present = env::var_os("DIGITALNZ_API_KEY").is_some();
+    DiagnosticCheck {
+        name: "digitalnz_api_key",
+        ok: true,
+        detail: if present {
+            "DIGITALNZ_API_KEY is set".to_string()
+        } else {
+            "DIGITALNZ_API_KEY is not set; live API commands need --api-key or env".to_string()
+        },
+    }
+}
+
+fn check_path_tool(tool: &'static str) -> DiagnosticCheck {
+    let found = find_on_path(tool);
+    DiagnosticCheck {
+        name: match tool {
+            "cargo" => "cargo_on_path",
+            "rustc" => "rustc_on_path",
+            "link.exe" => "linker_on_path",
+            _ => "tool_on_path",
+        },
+        ok: found.is_some(),
+        detail: found
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| format!("{tool} not found on PATH")),
+    }
+}
+
+fn find_on_path(tool: &str) -> Option<PathBuf> {
+    let paths = env::var_os("PATH")?;
+    env::split_paths(&paths).find_map(|dir| {
+        let candidate = dir.join(tool);
+        if candidate.is_file() {
+            Some(candidate)
+        } else {
+            None
+        }
+    })
 }

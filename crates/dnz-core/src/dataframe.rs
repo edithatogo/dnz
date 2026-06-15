@@ -21,7 +21,11 @@ impl IntoDataFrame for Vec<Record> {
             ids.push(rec.id);
             titles.push(rec.title);
             descriptions.push(rec.description.unwrap_or_default());
-            content_partners.push(rec.content_partner.map(|v| v.join(", ")).unwrap_or_default());
+            content_partners.push(
+                rec.content_partner
+                    .map(|v| v.join(", "))
+                    .unwrap_or_default(),
+            );
             categories.push(rec.category.map(|v| v.join(", ")).unwrap_or_default());
         }
 
@@ -38,5 +42,44 @@ impl IntoDataFrame for Vec<Record> {
             partner_series,
             category_series,
         ])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn converts_records_to_expected_dataframe_shape() {
+        let records = vec![
+            Record {
+                id: "1".to_string(),
+                title: "Kauri".to_string(),
+                description: Some("Tree".to_string()),
+                content_partner: Some(vec!["Te Papa".to_string(), "DNZ".to_string()]),
+                category: Some(vec!["Images".to_string()]),
+                ..Record::default()
+            },
+            Record {
+                id: "2".to_string(),
+                title: "Tui".to_string(),
+                ..Record::default()
+            },
+        ];
+
+        let frame = records.into_dataframe().unwrap();
+        assert_eq!(frame.height(), 2);
+        assert_eq!(frame.width(), 5);
+        assert_eq!(
+            frame.get_column_names(),
+            ["id", "title", "description", "content_partner", "category"]
+        );
+    }
+
+    #[test]
+    fn converts_empty_record_list_to_empty_dataframe_with_schema() {
+        let frame = Vec::<Record>::new().into_dataframe().unwrap();
+        assert_eq!(frame.height(), 0);
+        assert_eq!(frame.width(), 5);
     }
 }

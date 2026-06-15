@@ -47,6 +47,39 @@ impl Client {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn per_page_clamps_to_api_bounds() {
+        let client = Client::new("test");
+
+        assert_eq!(client.search("a").per_page(0).per_page, 1);
+        assert_eq!(client.search("a").per_page(1).per_page, 1);
+        assert_eq!(client.search("a").per_page(100).per_page, 100);
+        assert_eq!(client.search("a").per_page(1_000).per_page, 100);
+    }
+
+    #[test]
+    fn query_builder_stores_structured_filters() {
+        let builder = Client::new("test")
+            .search("kauri")
+            .and_filter("year", vec!["1901".to_string()])
+            .or_filter("category", vec!["Images".to_string()])
+            .without_filter("content_partner", vec!["Example".to_string()])
+            .geo_bbox(1.0, 2.0, 3.0, 4.0)
+            .sort("date", "desc");
+
+        assert_eq!(builder.and_filters["year"], vec!["1901"]);
+        assert_eq!(builder.or_filters["category"], vec!["Images"]);
+        assert_eq!(builder.without_filters["content_partner"], vec!["Example"]);
+        assert_eq!(builder.geo_bbox, Some([1.0, 2.0, 3.0, 4.0]));
+        assert_eq!(builder.sort.as_deref(), Some("date"));
+        assert_eq!(builder.direction.as_deref(), Some("desc"));
+    }
+}
+
 /// Builder pattern wrapper for composing complex search parameters.
 #[derive(Debug)]
 pub struct QueryBuilder {
@@ -177,7 +210,10 @@ impl QueryBuilder {
         if !self.facets.is_empty() {
             query_params.push(("facets".to_string(), self.facets.join(",")));
             query_params.push(("facets_page".to_string(), self.facets_page.to_string()));
-            query_params.push(("facets_per_page".to_string(), self.facets_per_page.to_string()));
+            query_params.push((
+                "facets_per_page".to_string(),
+                self.facets_per_page.to_string(),
+            ));
         }
 
         if let (Some(sort), Some(dir)) = (self.sort.clone(), self.direction.clone()) {
@@ -232,7 +268,9 @@ impl QueryBuilder {
 
         let response = loop {
             attempt += 1;
-            match self.client.http_client
+            match self
+                .client
+                .http_client
                 .get(&self.client.base_url)
                 .query(&query_params)
                 .send()
@@ -249,13 +287,19 @@ impl QueryBuilder {
                                 }
                             }
                         }
-                    } else if (status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS) && attempt < max_retries {
+                    } else if (status.is_server_error()
+                        || status == reqwest::StatusCode::TOO_MANY_REQUESTS)
+                        && attempt < max_retries
+                    {
                         let jitter = rand::random::<u64>() % 100;
                         let delay = base_delay * 2_u32.pow(attempt) + Duration::from_millis(jitter);
                         warn!(status = ?status, attempt = attempt, delay = ?delay, "Query failed with retriable status code");
                         tokio::time::sleep(delay).await;
                     } else {
-                        return Err(anyhow::anyhow!("Query failed with HTTP status code: {}", status));
+                        return Err(anyhow::anyhow!(
+                            "Query failed with HTTP status code: {}",
+                            status
+                        ));
                     }
                 }
                 Err(e) if attempt < max_retries => {

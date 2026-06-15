@@ -125,4 +125,3 @@ async fn test_mock_search_fields_and_excludes() {
     assert_eq!(response.search.results[0].id, "789");
     assert_eq!(response.search.results[0].title, "Short Item");
 }
-

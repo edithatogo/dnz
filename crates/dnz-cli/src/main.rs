@@ -2,7 +2,7 @@
 
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use dnz_cli::{Cli, Commands, Format, parse_bbox};
+use dnz_cli::{parse_bbox, workspace_diagnostics, Cli, Commands, Format};
 use dnz_core::Client;
 use std::env;
 use tracing::info;
@@ -11,7 +11,10 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 fn parse_filter_pair(filter: &str) -> anyhow::Result<(String, String)> {
     let parts: Vec<&str> = filter.splitn(2, ':').collect();
     if parts.len() != 2 {
-        return Err(anyhow!("Filter must be in 'field:value' format, got '{}'", filter));
+        return Err(anyhow!(
+            "Filter must be in 'field:value' format, got '{}'",
+            filter
+        ));
     }
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
@@ -28,16 +31,24 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Initializing DigitalNZ CLI Command...");
 
-    // Resolve API Key
-    let api_key = args.api_key
-        .or_else(|| env::var("DIGITALNZ_API_KEY").ok())
-        .ok_or_else(|| anyhow!("API Key missing. Set DIGITALNZ_API_KEY environment variable or pass --api-key"))?;
-
-    let client = Client::new(api_key);
-
     match args.command {
         Commands::Ping => {
             println!("{}", dnz_core::greeting());
+        }
+        Commands::Doctor => {
+            let checks = workspace_diagnostics();
+            let mut failed = 0;
+            println!("DigitalNZ workspace diagnostics");
+            for check in checks {
+                let status = if check.ok { "ok" } else { "warn" };
+                if !check.ok {
+                    failed += 1;
+                }
+                println!("- {status}: {} - {}", check.name, check.detail);
+            }
+            if failed > 0 {
+                std::process::exit(1);
+            }
         }
         Commands::Search {
             text,
@@ -50,6 +61,7 @@ async fn main() -> anyhow::Result<()> {
             and_filters,
             or_filters,
         } => {
+            let client = Client::new(resolve_api_key(args.api_key)?);
             let mut query = client.search(text).page(page).per_page(limit);
 
             if let Some(s) = sort {
@@ -68,7 +80,10 @@ async fn main() -> anyhow::Result<()> {
                 query = query.or_filter(f, vec![v]);
             }
 
-            let result = query.send().await.context("Failed to run DigitalNZ search")?;
+            let result = query
+                .send()
+                .await
+                .context("Failed to run DigitalNZ search")?;
             match format {
                 Format::Json => {
                     println!("{}", serde_json::to_string_pretty(&result)?);
@@ -85,8 +100,16 @@ async fn main() -> anyhow::Result<()> {
                     println!("| ID | Title | Content Partner | Category |");
                     println!("|---|---|---|---|");
                     for rec in result.search.results {
-                        let partner = rec.content_partner.as_ref().map(|v| v.join(", ")).unwrap_or_default();
-                        let cat = rec.category.as_ref().map(|v| v.join(", ")).unwrap_or_default();
+                        let partner = rec
+                            .content_partner
+                            .as_ref()
+                            .map(|v| v.join(", "))
+                            .unwrap_or_default();
+                        let cat = rec
+                            .category
+                            .as_ref()
+                            .map(|v| v.join(", "))
+                            .unwrap_or_default();
                         println!("| {} | {} | {} | {} |", rec.id, rec.title, partner, cat);
                     }
                 }
@@ -99,7 +122,13 @@ async fn main() -> anyhow::Result<()> {
             limit,
             format,
         } => {
-            let mut query = client.search(text).page(1).per_page(0).facets_page(page).facets_per_page(limit);
+            let client = Client::new(resolve_api_key(args.api_key)?);
+            let mut query = client
+                .search(text)
+                .page(1)
+                .per_page(0)
+                .facets_page(page)
+                .facets_per_page(limit);
             for f in fields {
                 query = query.facet(f);
             }
@@ -125,4 +154,12 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn resolve_api_key(api_key: Option<String>) -> anyhow::Result<String> {
+    api_key
+        .or_else(|| env::var("DIGITALNZ_API_KEY").ok())
+        .ok_or_else(|| {
+            anyhow!("API Key missing. Set DIGITALNZ_API_KEY environment variable or pass --api-key")
+        })
 }

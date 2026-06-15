@@ -1,0 +1,40 @@
+table Citations
+    description: Citation rows generated from DigitalNZ records.
+
+    column CitationKey
+        dataType: string
+        sourceColumn: citation_key
+        summarizeBy: none
+
+    column RecordId
+        dataType: string
+        sourceColumn: record_id
+        summarizeBy: none
+
+    column CitationText
+        dataType: string
+        sourceColumn: citation_text
+        summarizeBy: none
+
+    column SourceUrl
+        dataType: string
+        sourceColumn: source_url
+        summarizeBy: none
+
+    partition Citations = m
+        mode: import
+        source =
+            let
+                Source = LoadCsv(CitationsCsvPath),
+                Typed = Table.TransformColumnTypes(
+                    Source,
+                    {
+                        {"citation_key", type text},
+                        {"record_id", type text},
+                        {"citation_text", type text},
+                        {"source_url", type text}
+                    }
+                )
+            in
+                Typed
+

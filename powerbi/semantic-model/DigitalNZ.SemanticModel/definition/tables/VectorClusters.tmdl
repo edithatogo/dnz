@@ -1,0 +1,34 @@
+table VectorClusters
+    description: Semantic vector cluster assignments for DigitalNZ records.
+
+    column RecordId
+        dataType: string
+        sourceColumn: record_id
+        summarizeBy: none
+
+    column ClusterId
+        dataType: string
+        sourceColumn: cluster_id
+        summarizeBy: none
+
+    column SimilarityScore
+        dataType: double
+        sourceColumn: similarity_score
+        summarizeBy: sum
+
+    partition VectorClusters = m
+        mode: import
+        source =
+            let
+                Source = LoadCsv(VectorClustersCsvPath),
+                Typed = Table.TransformColumnTypes(
+                    Source,
+                    {
+                        {"record_id", type text},
+                        {"cluster_id", type text},
+                        {"similarity_score", type number}
+                    }
+                )
+            in
+                Typed
+

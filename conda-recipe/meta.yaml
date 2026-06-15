@@ -1,0 +1,35 @@
+{% set name = "dnz-python" %}
+{% set version = "0.1.0" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  script:
+    - maturin build --release --manifest-path crates/dnz-python/Cargo.toml --out dist
+    - {{ PYTHON }} -m pip install dist/*.whl --no-deps --ignore-installed -vv
+
+requirements:
+  build:
+    - {{ compiler('rust') }}
+    - maturin
+  host:
+    - python
+    - pip
+    - maturin
+  run:
+    - python
+
+test:
+  imports:
+    - dnz
+
+about:
+  summary: Python FFI bindings for the DigitalNZ Rust integration hub.
+  license: MIT
+  license_file: LICENSE

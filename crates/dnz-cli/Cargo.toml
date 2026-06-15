@@ -3,9 +3,15 @@ name = "dnz-cli"
 version = "0.1.0"
 edition = "2021"
 description = "Command Line Interface (CLI) client for DigitalNZ API"
+license = "MIT"
+repository = "https://github.com/edithatogo/dnz"
+homepage = "https://github.com/edithatogo/dnz"
+readme = "../../README.md"
+keywords = ["digitalnz", "cli", "heritage", "api"]
+categories = ["command-line-utilities"]
 
 [dependencies]
-dnz-core = { path = "../dnz-core" }
+dnz-core = { version = "0.1.0", path = "../dnz-core" }
 tokio = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }

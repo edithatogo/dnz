@@ -3,12 +3,21 @@ name = "dnz-mcp"
 version = "0.1.0"
 edition = "2021"
 description = "Model Context Protocol (MCP) server for DigitalNZ API"
+license = "MIT"
+repository = "https://github.com/edithatogo/dnz"
+homepage = "https://github.com/edithatogo/dnz"
+readme = "../../README.md"
+keywords = ["digitalnz", "mcp", "heritage", "api"]
+categories = ["api-bindings"]
 
 [dependencies]
-dnz-core = { path = "../dnz-core" }
+dnz-core = { version = "0.1.0", path = "../dnz-core" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
+
+[dev-dependencies]
+wiremock = { workspace = true }

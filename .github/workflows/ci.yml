@@ -25,12 +25,28 @@ jobs:
 
       - name: Cache Cargo Dependencies
         uses: swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Verify Formatting
         run: cargo fmt --all -- --check
 
       - name: Run Linter (Clippy)
         run: cargo clippy --all-targets -- -D warnings
+
+      - name: Install Cargo Audit
+        run: cargo install cargo-audit
+
+      - name: Run Dependency Audit
+        run: cargo audit
+
+      - name: Validate TMDL Scaffold
+        shell: pwsh
+        run: ./scripts/validate-tmdl.ps1
+
+      - name: Validate Package Metadata
+        shell: pwsh
+        run: ./scripts/validate-package-metadata.ps1
 
       - name: Install Cargo Tarpaulin
         run: cargo install cargo-tarpaulin

@@ -49,21 +49,18 @@
 - Folder: [open-science-export](./tracks/open-science-export)
 
 ---
-## [ ] Track 13: Hardening, Coverage & Registry Submission
+## [~] Track 13: Hardening, Coverage & Registry Submission
 - Folder: [hardening-coverage-registry-submission](./tracks/hardening-coverage-registry-submission)
 
 ---
-## [ ] Track 14: Workspace Diagnostics, Audits & Pre-commit Hooks
+## [x] Track 14: Workspace Diagnostics, Audits & Pre-commit Hooks
 - Folder: [workspace-diagnostics-audits-pre-commit](./tracks/workspace-diagnostics-audits-pre-commit)
 
 
 ---
-## [ ] Track 15: Power BI Semantic Model Integration
+## [x] Track 15: Power BI Semantic Model Integration
 - Folder: [power-bi-semantic-model-integration](./tracks/power-bi-semantic-model-integration)
 
 ---
-## [ ] Track 16: Semantic Docs & Conda-forge Packaging
+## [x] Track 16: Semantic Docs & Conda-forge Packaging
 - Folder: [semantic-model-docs-conda-packaging](./tracks/semantic-model-docs-conda-packaging)
-
-
-

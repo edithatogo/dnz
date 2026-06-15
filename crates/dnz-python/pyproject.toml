@@ -7,8 +7,14 @@ name = "dnz"
 version = "0.1.0"
 description = "High-performance Python client wrapper for the DigitalNZ API built in Rust"
 requires-python = ">=3.8"
+license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
+    "License :: OSI Approved :: MIT License",
     "Topic :: Software Development :: Libraries :: Python Modules"
 ]
+
+[project.urls]
+Homepage = "https://github.com/edithatogo/dnz"
+Repository = "https://github.com/edithatogo/dnz"

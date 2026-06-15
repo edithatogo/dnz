@@ -1,0 +1,22 @@
+table DimDate
+    description: Year-level date dimension for chronological DigitalNZ analysis.
+
+    column Year
+        dataType: int64
+        sourceColumn: Year
+        summarizeBy: none
+
+    column Decade
+        dataType: string
+        sourceColumn: Decade
+        summarizeBy: none
+
+    partition DimDate = calculated
+        mode: import
+        source =
+            SELECTCOLUMNS(
+                GENERATESERIES(1800, 2030, 1),
+                "Year", [Value],
+                "Decade", FORMAT(INT([Value] / 10) * 10, "0") & "s"
+            )
+

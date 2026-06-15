@@ -2,7 +2,7 @@
 
 use crate::client::Client;
 use crate::models::Record;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use tracing::{info, warn};
 
 /// High-level query coordinator mapping density-aware partitioned queries.
@@ -21,7 +21,8 @@ impl Autopilot {
         info!(query = query_text, "Starting agentic deep harvest pipeline");
 
         // Step 1: Query year facet density to evaluate how to partition
-        let facet_response = self.client
+        let facet_response = self
+            .client
             .search(query_text)
             .per_page(0)
             .facet("year")
@@ -29,12 +30,17 @@ impl Autopilot {
             .send()
             .await?;
 
-        let year_counts = facet_response.search.facets
+        let year_counts = facet_response
+            .search
+            .facets
             .get("year")
             .cloned()
             .unwrap_or_default();
 
-        info!(years_found = year_counts.len(), "Evaluated query density facets");
+        info!(
+            years_found = year_counts.len(),
+            "Evaluated query density facets"
+        );
 
         let mut partitions = Vec::new();
 
@@ -66,7 +72,7 @@ impl Autopilot {
                     let mut records = Vec::new();
                     // Estimate page iteration limit
                     let max_pages = ((record_count + 99) / 100).min(10) as u32; // Limit to 1000 per partition (API limit)
-                    
+
                     info!(year = %yr, expected_records = record_count, pages = max_pages, "Fetching query partition segment");
 
                     for page in 1..=max_pages {
@@ -109,7 +115,119 @@ impl Autopilot {
             }
         }
 
-        info!(total_harvested = all_records.len(), "Finished deep harvest query loop");
+        info!(
+            total_harvested = all_records.len(),
+            "Finished deep harvest query loop"
+        );
         Ok(all_records)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::matchers::{method, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn harvest_deep_returns_empty_when_year_facets_are_absent() {
+        let mock_server = MockServer::start().await;
+        let facet_body = serde_json::json!({
+            "search": {
+                "result_count": 0,
+                "results": [],
+                "facets": {}
+            }
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("text", "kauri"))
+            .and(query_param("facets", "year"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(facet_body))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let client = Client::new("test_key").with_base_url(mock_server.uri());
+        let records = Autopilot::new(client).harvest_deep("kauri").await.unwrap();
+
+        assert!(records.is_empty());
+    }
+
+    #[tokio::test]
+    async fn harvest_deep_fetches_year_partitions_and_deduplicates_records() {
+        let mock_server = MockServer::start().await;
+        let facet_body = serde_json::json!({
+            "search": {
+                "result_count": 3,
+                "results": [],
+                "facets": {
+                    "year": {
+                        "1900": 1,
+                        "1901": 2,
+                        "1902": 0
+                    }
+                }
+            }
+        });
+        let year_1900_body = serde_json::json!({
+            "search": {
+                "result_count": 1,
+                "results": [
+                    { "id": "rec-1", "title": "Record One" }
+                ],
+                "facets": {}
+            }
+        });
+        let year_1901_body = serde_json::json!({
+            "search": {
+                "result_count": 2,
+                "results": [
+                    { "id": "rec-1", "title": "Record One Duplicate" },
+                    { "id": "rec-2", "title": "Record Two" }
+                ],
+                "facets": {}
+            }
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("text", "kauri"))
+            .and(query_param("facets", "year"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(facet_body))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(query_param("text", "kauri"))
+            .and(query_param("and[year][]", "1900"))
+            .and(query_param("page", "1"))
+            .and(query_param("per_page", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(year_1900_body))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(query_param("text", "kauri"))
+            .and(query_param("and[year][]", "1901"))
+            .and(query_param("page", "1"))
+            .and(query_param("per_page", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(year_1901_body))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let client = Client::new("test_key").with_base_url(mock_server.uri());
+        let mut ids: Vec<String> = Autopilot::new(client)
+            .harvest_deep("kauri")
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|record| record.id)
+            .collect();
+        ids.sort();
+
+        assert_eq!(ids, vec!["rec-1", "rec-2"]);
     }
 }

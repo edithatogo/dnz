@@ -3,6 +3,12 @@ name = "dnz-core"
 version = "0.1.0"
 edition = "2021"
 description = "Core client library wrapper for DigitalNZ API"
+license = "MIT"
+repository = "https://github.com/edithatogo/dnz"
+homepage = "https://github.com/edithatogo/dnz"
+readme = "../../README.md"
+keywords = ["digitalnz", "heritage", "api", "client"]
+categories = ["api-bindings"]
 
 [dependencies]
 tokio = { workspace = true }
@@ -14,6 +20,7 @@ thiserror = { workspace = true }
 anyhow = { workspace = true }
 nutype = { workspace = true }
 polars = { workspace = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 wiremock = { workspace = true }
@@ -23,4 +30,3 @@ divan = "0.1"
 [[bench]]
 name = "benchmarks"
 harness = false
-

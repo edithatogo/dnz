@@ -52,3 +52,8 @@ graph TD
     MCP[dnz-mcp Crate] --> |Imports| CORE
     PYTHON[dnz-python Crate] --> |FFI Wrappers| CORE
 ```
+
+## Semantic Model
+
+The Power BI semantic model scaffold lives in `powerbi/semantic-model/DigitalNZ.SemanticModel/definition`.
+Its generated data dictionary is available at `docs/src/content/docs/generated/semantic-model-dictionary.md`.

@@ -1,0 +1,40 @@
+table Measures
+    description: Analytical DAX measures for DigitalNZ reporting.
+    isHidden
+
+    measure Total Records = COUNTROWS(Records)
+        formatString: #,0
+        displayFolder: Core
+
+    measure Records With Dates = CALCULATE(COUNTROWS(Records), NOT ISBLANK(Records[Year]))
+        formatString: #,0
+        displayFolder: Time
+
+    measure Unique Citations = DISTINCTCOUNT(Citations[CitationKey])
+        formatString: #,0
+        displayFolder: Citations
+
+    measure Citation Coverage % = DIVIDE([Unique Citations], [Total Records])
+        formatString: 0.0%
+        displayFolder: Citations
+
+    measure Distinct Content Partners = DISTINCTCOUNT(Records[ContentPartner])
+        formatString: #,0
+        displayFolder: Core
+
+    measure Distinct Categories = DISTINCTCOUNT(Records[Category])
+        formatString: #,0
+        displayFolder: Core
+
+    measure Records Per Year = [Total Records]
+        formatString: #,0
+        displayFolder: Time
+
+    measure Vector Cluster Count = DISTINCTCOUNT(VectorClusters[ClusterId])
+        formatString: #,0
+        displayFolder: Semantic Search
+
+    measure Average Similarity Score = AVERAGE(VectorClusters[SimilarityScore])
+        formatString: 0.000
+        displayFolder: Semantic Search
+

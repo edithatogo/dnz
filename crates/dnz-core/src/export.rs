@@ -4,7 +4,10 @@ use crate::models::Record;
 use serde_json::json;
 
 /// Generate a Frictionless Data Package descriptor (datapackage.json) for record sets.
-pub fn generate_frictionless_datapackage(records: &[Record], package_name: &str) -> serde_json::Value {
+pub fn generate_frictionless_datapackage(
+    records: &[Record],
+    package_name: &str,
+) -> serde_json::Value {
     json!({
         "profile": "tabular-data-package",
         "name": package_name,
@@ -49,4 +52,41 @@ pub fn generate_schema_ld(records: &[Record], base_uri: &str) -> serde_json::Val
         "size": records.len(),
         "temporalCoverage": "1800/2026"
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn records() -> Vec<Record> {
+        vec![Record {
+            id: "1".to_string(),
+            title: "Kauri".to_string(),
+            ..Record::default()
+        }]
+    }
+
+    #[test]
+    fn frictionless_datapackage_declares_records_resource() {
+        let package = generate_frictionless_datapackage(&records(), "dnz-test");
+
+        assert_eq!(package["profile"], "tabular-data-package");
+        assert_eq!(package["name"], "dnz-test");
+        assert_eq!(package["resources"][0]["name"], "records");
+        assert_eq!(package["resources"][0]["path"], "records.csv");
+        assert_eq!(package["resources"][0]["record_count"], 1);
+    }
+
+    #[test]
+    fn schema_ld_declares_dataset_distribution() {
+        let schema = generate_schema_ld(&records(), "https://example.test/dnz");
+
+        assert_eq!(schema["@type"], "Dataset");
+        assert_eq!(schema["url"], "https://example.test/dnz");
+        assert_eq!(
+            schema["distribution"][0]["contentUrl"],
+            "https://example.test/dnz/records.csv"
+        );
+        assert_eq!(schema["size"], 1);
+    }
 }

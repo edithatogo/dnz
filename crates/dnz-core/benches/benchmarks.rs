@@ -14,7 +14,9 @@ fn bench_record_to_dataframe() {
         records.push(Record {
             id: format!("rec_{}", i),
             title: format!("Record Title {}", i),
-            description: Some("A standard record description used during benchmark suites.".to_string()),
+            description: Some(
+                "A standard record description used during benchmark suites.".to_string(),
+            ),
             collection: Some(vec!["GLAM-Data".to_string()]),
             content_partner: Some(vec!["Partner Institutional System".to_string()]),
             category: Some(vec!["Documents".to_string()]),

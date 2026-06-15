@@ -1,0 +1,71 @@
+table Records
+    description: Harvested DigitalNZ records from the Frictionless records resource.
+
+    column RecordId
+        dataType: string
+        sourceColumn: id
+        summarizeBy: none
+
+    column Title
+        dataType: string
+        sourceColumn: title
+        summarizeBy: none
+
+    column Description
+        dataType: string
+        sourceColumn: description
+        summarizeBy: none
+
+    column ContentPartner
+        dataType: string
+        sourceColumn: content_partner
+        summarizeBy: none
+
+    column Category
+        dataType: string
+        sourceColumn: category
+        summarizeBy: none
+
+    column DateText
+        dataType: string
+        sourceColumn: date
+        summarizeBy: none
+
+    column Year
+        dataType: int64
+        sourceColumn: year
+        summarizeBy: none
+
+    column DisplayUrl
+        dataType: string
+        sourceColumn: display_url
+        summarizeBy: none
+
+    column SourceUrl
+        dataType: string
+        sourceColumn: source_url
+        summarizeBy: none
+
+    partition Records = m
+        mode: import
+        source =
+            let
+                Source = LoadCsv(RecordsCsvPath),
+                WithYear = if Table.HasColumns(Source, "year") then Source else Table.AddColumn(Source, "year", each try Number.FromText(Text.Start(Text.Select([date], {"0".."9"}), 4)) otherwise null, Int64.Type),
+                Typed = Table.TransformColumnTypes(
+                    WithYear,
+                    {
+                        {"id", type text},
+                        {"title", type text},
+                        {"description", type text},
+                        {"content_partner", type text},
+                        {"category", type text},
+                        {"date", type text},
+                        {"year", Int64.Type},
+                        {"display_url", type text},
+                        {"source_url", type text}
+                    }
+                )
+            in
+                Typed
+

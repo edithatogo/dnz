@@ -187,37 +187,56 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn handle_request(req: &JsonRpcRequest, client: &Client) -> anyhow::Result<serde_json::Value> {
+async fn handle_request(
+    req: &JsonRpcRequest,
+    client: &Client,
+) -> anyhow::Result<serde_json::Value> {
     match req.method.as_str() {
-        "initialize" => {
-            Ok(serde_json::json!({
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "tools": {}
-                },
-                "serverInfo": {
-                    "name": "dnz-mcp",
-                    "version": "0.1.0"
-                }
-            }))
-        }
-        "tools/list" | "listTools" => {
-            Ok(get_tools_schema())
-        }
+        "initialize" => Ok(serde_json::json!({
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+                "tools": {}
+            },
+            "serverInfo": {
+                "name": "dnz-mcp",
+                "version": "0.1.0"
+            }
+        })),
+        "tools/list" | "listTools" => Ok(get_tools_schema()),
         "tools/call" | "callTool" => {
-            let params = req.params.as_ref().ok_or_else(|| anyhow::anyhow!("Missing params"))?;
-            let tool_name = params.get("name").and_then(|v| v.as_str()).ok_or_else(|| anyhow::anyhow!("Missing tool name"))?;
-            let tool_arguments = params.get("arguments").ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+            let params = req
+                .params
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Missing params"))?;
+            let tool_name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing tool name"))?;
+            let tool_arguments = params
+                .get("arguments")
+                .ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
 
             match tool_name {
                 "search_digitalnz" => {
-                    let text = tool_arguments.get("text").and_then(|v| v.as_str()).ok_or_else(|| anyhow::anyhow!("Missing argument: text"))?;
-                    let page = tool_arguments.get("page").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
-                    let limit = tool_arguments.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as u32;
-                    
+                    let text = tool_arguments
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| anyhow::anyhow!("Missing argument: text"))?;
+                    let page = tool_arguments
+                        .get("page")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(1) as u32;
+                    let limit = tool_arguments
+                        .get("limit")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(20) as u32;
+
                     let mut query = client.search(text).page(page).per_page(limit);
                     if let Some(sort) = tool_arguments.get("sort").and_then(|v| v.as_str()) {
-                        let dir = tool_arguments.get("direction").and_then(|v| v.as_str()).unwrap_or("asc");
+                        let dir = tool_arguments
+                            .get("direction")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("asc");
                         query = query.sort(sort, dir);
                     }
 
@@ -232,13 +251,29 @@ async fn handle_request(req: &JsonRpcRequest, client: &Client) -> anyhow::Result
                     }))
                 }
                 "get_digitalnz_facets" => {
-                    let text = tool_arguments.get("text").and_then(|v| v.as_str()).ok_or_else(|| anyhow::anyhow!("Missing argument: text"))?;
-                    let fields_val = tool_arguments.get("fields").ok_or_else(|| anyhow::anyhow!("Missing argument: fields"))?;
+                    let text = tool_arguments
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| anyhow::anyhow!("Missing argument: text"))?;
+                    let fields_val = tool_arguments
+                        .get("fields")
+                        .ok_or_else(|| anyhow::anyhow!("Missing argument: fields"))?;
                     let fields: Vec<String> = serde_json::from_value(fields_val.clone())?;
-                    let page = tool_arguments.get("page").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
-                    let limit = tool_arguments.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as u32;
+                    let page = tool_arguments
+                        .get("page")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(1) as u32;
+                    let limit = tool_arguments
+                        .get("limit")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(10) as u32;
 
-                    let mut query = client.search(text).page(1).per_page(0).facets_page(page).facets_per_page(limit);
+                    let mut query = client
+                        .search(text)
+                        .page(1)
+                        .per_page(0)
+                        .facets_page(page)
+                        .facets_per_page(limit);
                     for f in fields {
                         query = query.facet(f);
                     }
@@ -253,9 +288,194 @@ async fn handle_request(req: &JsonRpcRequest, client: &Client) -> anyhow::Result
                         ]
                     }))
                 }
-                _ => Err(anyhow::anyhow!("Tool not found: {}", tool_name))
+                _ => Err(anyhow::anyhow!("Tool not found: {}", tool_name)),
             }
         }
-        _ => Err(anyhow::anyhow!("Method not found: {}", req.method))
+        _ => Err(anyhow::anyhow!("Method not found: {}", req.method)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use wiremock::matchers::{method, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn request(method: &str, params: Option<serde_json::Value>) -> JsonRpcRequest {
+        JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            method: method.to_string(),
+            params,
+            id: Some(json!(1)),
+        }
+    }
+
+    fn text_content(response: &serde_json::Value) -> &str {
+        response["content"][0]["text"]
+            .as_str()
+            .expect("tool response should include text content")
+    }
+
+    #[test]
+    fn tools_schema_lists_expected_tools() {
+        let schema = get_tools_schema();
+        let tool_names: Vec<&str> = schema["tools"]
+            .as_array()
+            .expect("tools schema should contain tools array")
+            .iter()
+            .map(|tool| tool["name"].as_str().expect("tool should have a name"))
+            .collect();
+
+        assert!(tool_names.contains(&"search_digitalnz"));
+        assert!(tool_names.contains(&"get_digitalnz_facets"));
+        assert_eq!(
+            schema["tools"][0]["inputSchema"]["required"],
+            json!(["text"])
+        );
+    }
+
+    #[tokio::test]
+    async fn initialize_returns_mcp_server_info() {
+        let client = Client::new("test");
+        let response = handle_request(&request("initialize", None), &client)
+            .await
+            .expect("initialize should succeed");
+
+        assert_eq!(response["protocolVersion"], "2024-11-05");
+        assert_eq!(response["serverInfo"]["name"], "dnz-mcp");
+        assert!(response["capabilities"]["tools"].is_object());
+    }
+
+    #[tokio::test]
+    async fn tool_call_reports_missing_and_unknown_tools() {
+        let client = Client::new("test");
+
+        let missing_params = handle_request(&request("tools/call", None), &client)
+            .await
+            .expect_err("missing params should be rejected");
+        assert!(missing_params.to_string().contains("Missing params"));
+
+        let missing_name = handle_request(&request("tools/call", Some(json!({}))), &client)
+            .await
+            .expect_err("missing tool name should be rejected");
+        assert!(missing_name.to_string().contains("Missing tool name"));
+
+        let unknown_tool = handle_request(
+            &request(
+                "tools/call",
+                Some(json!({
+                    "name": "unknown_tool",
+                    "arguments": {}
+                })),
+            ),
+            &client,
+        )
+        .await
+        .expect_err("unknown tool should be rejected");
+        assert!(unknown_tool.to_string().contains("Tool not found"));
+    }
+
+    #[tokio::test]
+    async fn search_tool_calls_digitalnz_client() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(query_param("api_key", "test-key"))
+            .and(query_param("text", "kauri"))
+            .and(query_param("page", "2"))
+            .and(query_param("per_page", "5"))
+            .and(query_param("sort", "date"))
+            .and(query_param("direction", "desc"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "search": {
+                    "result_count": 1,
+                    "results": [
+                        {
+                            "id": "abc",
+                            "title": "Kauri gum record",
+                            "description": null
+                        }
+                    ],
+                    "facets": {}
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = Client::new("test-key").with_base_url(server.uri());
+        let response = handle_request(
+            &request(
+                "tools/call",
+                Some(json!({
+                    "name": "search_digitalnz",
+                    "arguments": {
+                        "text": "kauri",
+                        "page": 2,
+                        "limit": 5,
+                        "sort": "date",
+                        "direction": "desc"
+                    }
+                })),
+            ),
+            &client,
+        )
+        .await
+        .expect("search tool should return mocked results");
+
+        let text = text_content(&response);
+        assert!(text.contains("Found 1 results"));
+        assert!(text.contains("Kauri gum record"));
+    }
+
+    #[tokio::test]
+    async fn facets_tool_calls_digitalnz_client() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(query_param("api_key", "test-key"))
+            .and(query_param("text", "kauri"))
+            .and(query_param("page", "1"))
+            .and(query_param("per_page", "1"))
+            .and(query_param("facets", "category,collection"))
+            .and(query_param("facets_page", "2"))
+            .and(query_param("facets_per_page", "3"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "search": {
+                    "result_count": 0,
+                    "results": [],
+                    "facets": {
+                        "category": {
+                            "Images": 7
+                        },
+                        "collection": {
+                            "Museum": 2
+                        }
+                    }
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = Client::new("test-key").with_base_url(server.uri());
+        let response = handle_request(
+            &request(
+                "tools/call",
+                Some(json!({
+                    "name": "get_digitalnz_facets",
+                    "arguments": {
+                        "text": "kauri",
+                        "fields": ["category", "collection"],
+                        "page": 2,
+                        "limit": 3
+                    }
+                })),
+            ),
+            &client,
+        )
+        .await
+        .expect("facets tool should return mocked facets");
+
+        let text = text_content(&response);
+        assert!(text.contains("\"Images\": 7"));
+        assert!(text.contains("\"Museum\": 2"));
     }
 }

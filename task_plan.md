@@ -1,6 +1,6 @@
-# Swarm Task Plan: DigitalNZ Integration Hub (12 Tracks Execution)
+# Swarm Task Plan: DigitalNZ Integration Hub (16 Tracks Execution)
 
-This plan maps out the step-by-step tasks to implement the 12 project tracks under strict quality and automation gates.
+This plan maps out the step-by-step tasks to implement the project tracks under strict quality and automation gates.
 
 ## Phase 1: Foundations & Infrastructure (Tracks 1 - 4)
 - [ ] Task 1.1: Complete environment setup (Cargo/Pixi targets, ruff lint config). -> **Cline** & **Codex**
@@ -30,28 +30,25 @@ This plan maps out the step-by-step tasks to implement the 12 project tracks und
 - [ ] **Phase 3 Validation:** Perform final test suites verification, checking that CI builds cleanly. -> **Quality_Validator**
 
 ## Phase 4: Production Hardening & Diagnostics (Tracks 13 - 14)
-- [ ] Task 4.1: Configure GitHub Actions release secrets for crates.io and PyPI. -> **Quality_Validator**
-- [ ] Task 4.2: Verify line coverage exceeds 90% target locally using `cargo tarpaulin`. -> **Quality_Validator**
-- [ ] Task 4.3: Profile and optimize hot-paths in vector similarity search. -> **Codex**
-- [ ] Task 4.4: Integrate cargo-audit checks in pixi tasks and CI builds. -> **Quality_Validator**
-- [ ] Task 4.5: Create workspace doctor script diagnosing PATH, targets, and disk limits. -> **Quality_Validator**
-- [ ] Task 4.6: Set up automated local Git pre-commit verification hooks. -> **Quality_Validator**
-- [ ] **Phase 4 Validation:** Verify package dry-runs finish successfully and diagnostic checks pass. -> **Quality_Validator**
+- [~] Task 4.1: Configure GitHub Actions release secrets for crates.io and PyPI. -> **Quality_Validator** (local workflow mapping added; registry writes remain dry-run/manual only)
+- [ ] Task 4.2: Verify line coverage exceeds 90% target locally using `cargo tarpaulin`. -> **General_Coder** (not verified; local `cargo check` is blocked before project compilation)
+- [ ] Task 4.3: Profile and optimize hot-paths in vector similarity search. -> **General_Coder** (no profiling evidence reconciled)
+- [x] Task 4.4: Integrate cargo-audit checks in pixi tasks and CI builds. -> **Quality_Validator** / **General_Coder** (`pixi` task added; CI installs and runs `cargo audit`)
+- [x] Task 4.5: Create workspace doctor script diagnosing PATH, targets, and disk limits. -> **General_Coder** (`scripts/workspace-doctor.ps1` added and run)
+- [x] Task 4.6: Set up automated local Git pre-commit verification hooks. -> **General_Coder** (`.githooks/pre-commit` and `pixi install-hooks` added)
+- [~] **Phase 4 Validation:** Verify package dry-runs finish successfully and diagnostic checks pass. -> **Quality_Validator** (blocked locally: doctor reports target write failures, Git `link.exe`, workspace path spaces, and 0 GB free)
 
 
 ## Phase 5: Semantic Reporting & Business Intelligence (Track 15)
-- [ ] Task 5.1: Scaffold Power BI TMDL model metadata project. -> **Codex**
-- [ ] Task 5.2: Configure Power Query M source queries referencing Frictionless CSV outputs. -> **Codex**
-- [ ] Task 5.3: Implement DAX analysis measures for citation counting and clustering. -> **Codex**
-- [ ] Task 5.4: Define model relationships, hierarchies, and star schema routing. -> **Codex**
-- [ ] **Phase 5 Validation:** Compile and validate TMDL semantic model schemas. -> **Quality_Validator**
+- [x] Task 5.1: Scaffold Power BI TMDL model metadata project. -> **Codex**
+- [x] Task 5.2: Configure Power Query M source queries referencing Frictionless CSV outputs. -> **Codex**
+- [x] Task 5.3: Implement DAX analysis measures for citation counting and clustering. -> **Codex**
+- [x] Task 5.4: Define model relationships, hierarchies, and star schema routing. -> **Codex**
+- [~] **Phase 5 Validation:** Compile and validate TMDL semantic model schemas. -> **Quality_Validator** (pending connected `pbi-cli` / Power BI validation)
 
 ## Phase 6: Automated Packaging & Documentation Sync (Track 16)
-- [ ] Task 6.1: Develop data dictionary extraction parser converting TMDL schema to Markdown. -> **Codex**
-- [ ] Task 6.2: Integrate semantic model dictionaries into the Astro layout architecture dashboard. -> **Cline**
-- [ ] Task 6.3: Configure Conda distribution recipes for Python FFI binary packages. -> **Quality_Validator**
-- [ ] Task 6.4: Add pull request checking step executing TMDL compilation validation in CI. -> **Quality_Validator**
-- [ ] **Phase 6 Validation:** Run dry-runs of Conda packaging pipelines and verify docs sync cleanly. -> **Quality_Validator**
-
-
-
+- [x] Task 6.1: Develop data dictionary extraction parser converting TMDL schema to Markdown. -> **Codex**
+- [x] Task 6.2: Integrate semantic model dictionaries into the Astro layout architecture dashboard. -> **Cline**
+- [x] Task 6.3: Configure Conda distribution recipes for Python FFI binary packages. -> **Quality_Validator**
+- [x] Task 6.4: Add pull request checking step executing TMDL compilation validation in CI. -> **Quality_Validator**
+- [~] **Phase 6 Validation:** Run dry-runs of Conda packaging pipelines and verify docs sync cleanly. -> **Quality_Validator** (`validate-tmdl.ps1` and `tmdl-data-dictionary.ps1` pass locally; Conda dry-run remains blocked by local cargo target/disk environment)

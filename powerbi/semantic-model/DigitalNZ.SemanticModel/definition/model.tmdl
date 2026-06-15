@@ -1,0 +1,17 @@
+model DigitalNZ
+    culture: en-US
+    defaultPowerBIDataSourceVersion: powerBI_V3
+    discourageImplicitMeasures
+
+relationship Records_DimDate_Year
+    fromColumn: Records.Year
+    toColumn: DimDate.Year
+
+relationship Citations_Records_RecordId
+    fromColumn: Citations.RecordId
+    toColumn: Records.RecordId
+
+relationship VectorClusters_Records_RecordId
+    fromColumn: VectorClusters.RecordId
+    toColumn: Records.RecordId
+

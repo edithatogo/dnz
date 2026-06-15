@@ -96,8 +96,9 @@ impl PyQueryBuilder {
         py.allow_threads(|| {
             let rt = tokio::runtime::Runtime::new()
                 .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-            
-            let mut builder = self.client
+
+            let mut builder = self
+                .client
                 .search(&self.text)
                 .page(self.page)
                 .per_page(self.per_page)
@@ -120,7 +121,8 @@ impl PyQueryBuilder {
             }
 
             let future = builder.send();
-            let response = rt.block_on(future)
+            let response = rt
+                .block_on(future)
                 .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
             let json_str = serde_json::to_string(&response)
                 .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;

@@ -21,3 +21,4 @@ wiremock = "0.6"
 proptest = "1.4"
 nutype = { version = "0.4", features = ["serde"] }
 polars = { version = "0.38", features = ["lazy", "parquet"] }
+rand = "0.8"

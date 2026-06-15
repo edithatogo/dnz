@@ -3,6 +3,10 @@ name = "dnz-python"
 version = "0.1.0"
 edition = "2021"
 description = "Python FFI bindings for DigitalNZ integration using PyO3"
+license = "MIT"
+repository = "https://github.com/edithatogo/dnz"
+homepage = "https://github.com/edithatogo/dnz"
+readme = "../../README.md"
 publish = false
 
 [lib]
@@ -10,7 +14,7 @@ name = "dnz"
 crate-type = ["cdylib"]
 
 [dependencies]
-dnz-core = { path = "../dnz-core" }
+dnz-core = { version = "0.1.0", path = "../dnz-core" }
 pyo3 = { version = "0.20", features = ["extension-module"] }
 tokio = { workspace = true }
 serde_json = { workspace = true }
