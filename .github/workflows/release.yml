@@ -1,0 +1,56 @@
+name: CD Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: dnz-linux
+            asset_name: dnz-linux-x86_64
+          - os: windows-latest
+            artifact_name: dnz-windows.exe
+            asset_name: dnz-windows-x86_64.exe
+          - os: macos-latest
+            artifact_name: dnz-mac
+            asset_name: dnz-macos-x86_64
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo Dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Compile Release Binaries
+        run: cargo build --release
+
+      - name: Rename Artifacts
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv target/release/dnz-cli.exe target/release/${{ matrix.asset_name }}
+            mv target/release/dnz-mcp.exe target/release/dnz-mcp-windows-x86_64.exe
+          else
+            mv target/release/dnz-cli target/release/${{ matrix.asset_name }}
+            mv target/release/dnz-mcp target/release/dnz-mcp-${{ matrix.os }}-x86_64
+          fi
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/release/dnz-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

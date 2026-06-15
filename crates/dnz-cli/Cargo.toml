@@ -1,0 +1,15 @@
+[package]
+name = "dnz-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Command Line Interface (CLI) client for DigitalNZ API"
+
+[dependencies]
+dnz-core = { path = "../dnz-core" }
+tokio = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }

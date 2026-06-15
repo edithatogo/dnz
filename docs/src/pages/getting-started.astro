@@ -1,0 +1,35 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Getting Started">
+  <div class="markdown-content">
+    <p>The <strong>DigitalNZ Integration Hub</strong> is a native, high-performance toolkit written in Rust, designed to connect New Zealand's digital heritage archives to modern software layers, CLI terminals, and AI developer engines.</p>
+
+    <h2>Installation & Setup</h2>
+    <p>Ensure you have <a href="https://rustup.rs/" style="color: #60a5fa;">Rust</a> and <a href="https://pixi.sh/" style="color: #60a5fa;">Pixi</a> installed on your local system.</p>
+
+    <h3>1. Configure API Key</h3>
+    <p>Export your DigitalNZ API key into your shell profile environment variables:</p>
+    <pre><code>export DIGITALNZ_API_KEY="your-api-key-here"</code></pre>
+
+    <h3>2. Build the Workspace</h3>
+    <p>To compile all binary utilities, FFI wrappers, library crates, and test targets concurrently, run:</p>
+    <pre><code>pixi run build</code></pre>
+
+    <h2>Using the CLI (<code>dnz-cli</code>)</h2>
+    <p>Run search queries formatting output directly as Markdown tables or structured JSON:</p>
+    <pre><code># Markdown table output
+cargo run --bin dnz-cli -- search "kiwi" --format markdown
+
+# Output formatted JSON string
+cargo run --bin dnz-cli -- search "kiwi" --format json</code></pre>
+
+    <p>Query collection facet distributions:</p>
+    <pre><code>cargo run --bin dnz-cli -- facets "tui" --fields category,collection --format markdown</code></pre>
+
+    <h2>Starting the MCP Server (<code>dnz-mcp</code>)</h2>
+    <p>Run the Model Context Protocol server over standard I/O (stdio) to interact with AI clients (e.g. Claude Desktop, Cline):</p>
+    <pre><code>cargo run --bin dnz-mcp</code></pre>
+  </div>
+</Layout>

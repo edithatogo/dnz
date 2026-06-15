@@ -1,0 +1,7 @@
+/target
+/.pixi
+/mutants.out
+/*.lcov
+/cobertura.xml
+/tarpaulin-report.html
+/Cargo.lock

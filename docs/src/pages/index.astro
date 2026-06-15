@@ -1,0 +1,98 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Integration Dashboard">
+  <div class="dashboard-hero">
+    <p class="tagline">Lightning-fast, memory-safe API integration with local semantic vector search, autopilot crawlers, and RAG optimization.</p>
+  </div>
+
+  <h2 class="section-title">Core Systems Overview</h2>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-icon">🤖</div>
+      <h3>Model Context Protocol (MCP)</h3>
+      <p>Exposes search and facets tools directly to LLM agents using async JSON-RPC over standard input/output channels.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-icon">⚡</div>
+      <h3>Agentic Query Autopilot</h3>
+      <p>Recursively splits search scopes based on year counts to crawl deep datasets past the API limit boundaries.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-icon">🔍</div>
+      <h3>Local Semantic Search</h3>
+      <p>Offline sentence embeddings generation and cosine similarity sorting computed on-device using the `candle` ML crate.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-icon">🐍</div>
+      <h3>Python FFI Bindings</h3>
+      <p>FFI mapping using `pyo3` and `maturin` to import native compiled client performance straight into Jupyter Notebooks.</p>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .dashboard-hero {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.05));
+    border: 1px solid var(--border-color);
+    padding: 2.5rem;
+    border-radius: 12px;
+    margin-bottom: 3rem;
+  }
+
+  .tagline {
+    font-size: 1.25rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    max-width: 800px;
+  }
+
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(59, 130, 246, 0.4);
+    box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.2);
+  }
+
+  .card-icon {
+    font-size: 2rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .card h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .card p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+</style>

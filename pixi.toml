@@ -1,0 +1,23 @@
+[project]
+name = "dnz-integration"
+version = "0.1.0"
+description = "DigitalNZ API integration in Rust"
+authors = ["Antigravity"]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64"]
+
+[dependencies]
+rust = ">=1.75"
+cargo-dist = ">=0.11.0"
+cargo-mutants = ">=24.0.0"
+cargo-tarpaulin = ">=0.27.0"
+openssl = ">=3.0"
+pkg-config = ">=0.29"
+
+[tasks]
+build = "cargo build"
+test = "cargo test"
+fmt = "cargo fmt --all"
+clippy = "cargo clippy --all-targets -- -D warnings"
+coverage = "cargo tarpaulin --out Xml"
+mutants = "cargo mutants"

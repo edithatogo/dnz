@@ -1,0 +1,187 @@
+---
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content="DigitalNZ Rust Hub Documentation" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Sidebar Navigation -->
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="logo-icon">🦀</span>
+          <span class="brand-name">DigitalNZ Hub</span>
+        </div>
+        <nav class="nav-links">
+          <a href="/" class="nav-item">Dashboard</a>
+          <a href="/getting-started" class="nav-item">Getting Started</a>
+          <a href="/architecture" class="nav-item">Architecture</a>
+        </nav>
+      </aside>
+
+      <!-- Main Portal Content -->
+      <main class="content-viewport">
+        <header class="header">
+          <h1>{title}</h1>
+        </header>
+        <div class="content-body">
+          <slot />
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
+
+<style is:global>
+  /* Premium Dark Theme System Variables */
+  :root {
+    --bg-dark: #0b0f19;
+    --bg-card: rgba(22, 30, 49, 0.4);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --brand-glow: #3b82f6;
+    --accent-glow: #10b981;
+    --font-sans: 'Inter', sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Sidebar styling */
+  .sidebar {
+    width: 260px;
+    background-color: #0f172a;
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 2rem 1.5rem;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 3rem;
+  }
+
+  .logo-icon {
+    font-size: 1.5rem;
+  }
+
+  .brand-name {
+    font-weight: 700;
+    font-size: 1.25rem;
+    background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .nav-item {
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .nav-item:hover {
+    color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.05);
+    transform: translateX(4px);
+  }
+
+  /* Content Viewport */
+  .content-viewport {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 3rem;
+    background: radial-gradient(circle at 80% 10%, rgba(59, 130, 246, 0.05), transparent 50%);
+  }
+
+  .header {
+    margin-bottom: 2.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1.5rem;
+  }
+
+  .header h1 {
+    font-weight: 700;
+    font-size: 2.25rem;
+    letter-spacing: -0.025em;
+  }
+
+  /* Standard typography rules inside markdown views */
+  .markdown-content h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+
+  .markdown-content p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+  }
+
+  .markdown-content pre {
+    background-color: #030712;
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+  }
+
+  .markdown-content code {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: #38bdf8;
+  }
+</style>

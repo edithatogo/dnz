@@ -1,0 +1,22 @@
+{
+  "server_name": "dnz-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for searching New Zealand cultural heritage collections via the DigitalNZ API.",
+  "command": "dnz-mcp",
+  "args": [],
+  "env": {
+    "DIGITALNZ_API_KEY": "YOUR_DIGITALNZ_API_KEY_HERE"
+  },
+  "capabilities": {
+    "tools": [
+      {
+        "name": "search_digitalnz",
+        "description": "Search DigitalNZ collection records for cultural heritage items, libraries, images, etc."
+      },
+      {
+        "name": "get_digitalnz_facets",
+        "description": "Harvest facet aggregates (counts of metadata terms like categories, partners) from DigitalNZ."
+      }
+    ]
+  }
+}

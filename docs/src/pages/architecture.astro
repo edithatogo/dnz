@@ -1,0 +1,61 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Workspace Architecture">
+  <div class="markdown-content">
+    <p>This project leverages a multi-crate Cargo workspace to separate core API logic from interface boundaries and client integrations.</p>
+
+    <h2>Directory Layout</h2>
+    <pre><code>dnz/
+├── Cargo.toml                 # Root workspace manifest
+├── pixi.toml                  # Local environment config
+├── docs/                      # Astro documentation (this portal)
+├── .github/                   # CI/CD verification workflows
+└── crates/
+    ├── dnz-core/              # Library containing core API wrappers
+    │   ├── src/
+    │   │   ├── client.rs      # HTTP client and backoff retry structures
+    │   │   ├── models.rs      # Serde schemas mapping DigitalNZ API JSON
+    │   │   ├── dataframe.rs   # Polars data extraction helpers
+    │   │   ├── vector.rs      # Offline Candle vector search and cosine math
+    │   │   ├── digest.rs      # RAG context formatting XML templates
+    │   │   └── autopilot.rs   # Density-based query partition plan
+    │   └── tests/             # Offline integration tests (wiremock)
+    │
+    ├── dnz-cli/               # CLI console wrapper application
+    │   └── src/
+    │       ├── lib.rs
+    │       └── main.rs        # CLI argument router
+    │
+    ├── dnz-mcp/               # Model Context Protocol stdio server
+    │   └── src/
+    │       └── main.rs        # JSON-RPC protocol loop
+    │
+    └── dnz-python/            # Python FFI bindings via PyO3 & maturin
+        └── src/
+            └── lib.rs         # PyO3 modules exports
+</code></pre>
+
+    <h2>Internal Module Architecture</h2>
+    <p>Core structures and serialization outputs flow directly into interface wrappers: </p>
+    
+    <div class="diagram-placeholder">
+      <p><strong>DigitalNZ API</strong> &harr; <em>reqwest</em> &harr; <strong>dnz-core</strong> &rarr; <strong>JSON Models</strong> | <strong>Polars DataFrames</strong> | <strong>Vector Embeddings</strong></p>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .diagram-placeholder {
+    background-color: #0f172a;
+    border: 1px dashed var(--border-color);
+    padding: 1.5rem;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 0.95rem;
+    color: #38bdf8;
+    text-align: center;
+    margin-top: 1.5rem;
+  }
+</style>
