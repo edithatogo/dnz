@@ -1,0 +1,8 @@
+[submodule "digitalnz"]
+	path = digitalnz
+	url = https://github.com/edithatogo/digitalnz.git
+	branch = master
+[submodule "pydnz"]
+	path = pydnz
+	url = https://github.com/edithatogo/pydnz.git
+	branch = master
