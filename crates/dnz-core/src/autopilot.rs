@@ -86,8 +86,10 @@ impl Autopilot {
 
                         match res {
                             Ok(search_res) => {
-                                records.extend(search_res.search.results);
-                                if search_res.search.results.is_empty() {
+                                let page_results = search_res.search.results;
+                                let is_empty = page_results.is_empty();
+                                records.extend(page_results);
+                                if is_empty {
                                     break;
                                 }
                             }
