@@ -28,3 +28,13 @@ pub use vector::VectorStore;
 pub fn greeting() -> &'static str {
     "Hello from dnz-core!"
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn greeting_returns_expected_message() {
+        assert_eq!(greeting(), "Hello from dnz-core!");
+    }
+}

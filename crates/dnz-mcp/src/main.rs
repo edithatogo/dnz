@@ -3,7 +3,6 @@
 
 use dnz_core::Client;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::env;
 use std::io;
 use tokio::io::AsyncBufReadExt;

@@ -50,6 +50,8 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wiremock::matchers::{method, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[test]
     fn per_page_clamps_to_api_bounds() {
@@ -77,6 +79,124 @@ mod tests {
         assert_eq!(builder.geo_bbox, Some([1.0, 2.0, 3.0, 4.0]));
         assert_eq!(builder.sort.as_deref(), Some("date"));
         assert_eq!(builder.direction.as_deref(), Some("desc"));
+    }
+
+    #[test]
+    fn test_clear_cache() {
+        let client = Client::new("test");
+        // Send a search (no actual HTTP call will be made with a fake API key,
+        // but the builder is created, and cache is empty initially)
+        let _builder = client.search("test").fields(vec!["id".to_string()]);
+        // Cache is empty after creation
+        {
+            let cache = client.cache.lock().unwrap();
+            assert!(cache.is_empty());
+        }
+        // Clear cache (should not panic even when already empty)
+        client.clear_cache();
+        {
+            let cache = client.cache.lock().unwrap();
+            assert!(cache.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cache_hit_returns_cached_response() {
+        let mock_server = MockServer::start().await;
+
+        let response_body = serde_json::json!({
+            "search": {
+                "result_count": 1,
+                "results": [
+                    { "id": "1", "title": "Cached Record" }
+                ]
+            }
+        });
+
+        // Only expect 1 HTTP request — the second call should use cache
+        Mock::given(method("GET"))
+            .and(query_param("text", "kauri"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let client = Client::new("test_key").with_base_url(mock_server.uri());
+
+        // First call — hits the mock server
+        let result1 = client.search("kauri").send().await.unwrap();
+        assert_eq!(result1.search.result_count, 1);
+        assert_eq!(result1.search.results[0].id, "1");
+
+        // Second call — should return from cache
+        let result2 = client.search("kauri").send().await.unwrap();
+        assert_eq!(result2.search.result_count, 1);
+        assert_eq!(result2.search.results[0].id, "1");
+    }
+
+    #[test]
+    fn test_query_builder_url_construction() {
+        let client = Client::new("test_key");
+
+        // Test basic fields and facets
+        let builder = client
+            .search("kauri")
+            .fields(vec!["id".to_string(), "title".to_string()])
+            .facet("category")
+            .page(2)
+            .per_page(50);
+
+        assert_eq!(builder.text, "kauri");
+        assert_eq!(builder.fields, vec!["id", "title"]);
+        assert_eq!(builder.facets, vec!["category"]);
+        assert_eq!(builder.page, 2);
+        assert_eq!(builder.per_page, 50);
+
+        // Test sort and direction
+        let builder = client.search("test").sort("date", "desc");
+        assert_eq!(builder.sort.as_deref(), Some("date"));
+        assert_eq!(builder.direction.as_deref(), Some("desc"));
+
+        // Test geo_bbox
+        let builder = client.search("test").geo_bbox(-45.0, 166.0, -48.0, 179.0);
+        assert_eq!(builder.geo_bbox, Some([-45.0, 166.0, -48.0, 179.0]));
+
+        // Test filters combination
+        let builder = client
+            .search("test")
+            .and_filter("year", vec!["1900".to_string(), "1901".to_string()])
+            .or_filter("category", vec!["Images".to_string()])
+            .without_filter("content_partner", vec!["Excluded".to_string()]);
+        assert_eq!(builder.and_filters["year"], vec!["1900", "1901"]);
+        assert_eq!(builder.or_filters["category"], vec!["Images"]);
+        assert_eq!(builder.without_filters["content_partner"], vec!["Excluded"]);
+
+        // Test facets_page and facets_per_page
+        let builder = client
+            .search("test")
+            .facet("category")
+            .facets_page(3)
+            .facets_per_page(25);
+        assert_eq!(builder.facets_page, 3);
+        assert_eq!(builder.facets_per_page, 25);
+
+        // Test disable_cache
+        let builder = client.search("test").disable_cache();
+        assert!(!builder.use_cache);
+
+        // Test default values
+        let builder = client.search("default");
+        assert_eq!(builder.page, 1);
+        assert_eq!(builder.per_page, 20);
+        assert!(builder.fields.is_empty());
+        assert!(builder.facets.is_empty());
+        assert!(builder.sort.is_none());
+        assert!(builder.direction.is_none());
+        assert!(builder.geo_bbox.is_none());
+        assert!(builder.and_filters.is_empty());
+        assert!(builder.or_filters.is_empty());
+        assert!(builder.without_filters.is_empty());
+        assert!(builder.use_cache);
     }
 }
 

@@ -83,14 +83,9 @@ jobs:
             echo "CARGO_REGISTRY_TOKEN is not configured or unavailable in this context."
           fi
 
-      - name: Dry-run dnz-core crate package
-        run: cargo publish -p dnz-core --dry-run
-
-      - name: Dry-run dnz-cli crate package
-        run: cargo publish -p dnz-cli --dry-run
-
-      - name: Dry-run dnz-mcp crate package
-        run: cargo publish -p dnz-mcp --dry-run
+      - name: Dry-run Cargo package publication
+        shell: pwsh
+        run: ./scripts/verify-cargo-publish-dryruns.ps1
 
   publish-pypi:
     name: Build Python package

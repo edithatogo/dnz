@@ -89,4 +89,22 @@ mod tests {
         );
         assert_eq!(schema["size"], 1);
     }
+
+    #[test]
+    fn test_frictionless_empty_records() {
+        let package = generate_frictionless_datapackage(&[], "empty-test");
+
+        assert_eq!(package["profile"], "tabular-data-package");
+        assert_eq!(package["name"], "empty-test");
+        assert_eq!(package["resources"][0]["record_count"], 0);
+    }
+
+    #[test]
+    fn test_schema_ld_empty_records() {
+        let schema = generate_schema_ld(&[], "https://example.test/empty");
+
+        assert_eq!(schema["@type"], "Dataset");
+        assert_eq!(schema["size"], 0);
+        assert_eq!(schema["url"], "https://example.test/empty");
+    }
 }

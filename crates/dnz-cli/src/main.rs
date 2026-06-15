@@ -2,7 +2,7 @@
 
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use dnz_cli::{parse_bbox, workspace_diagnostics, Cli, Commands, Format};
+use dnz_cli::{workspace_diagnostics, Cli, Commands, Format};
 use dnz_core::Client;
 use std::env;
 use tracing::info;
@@ -17,6 +17,35 @@ fn parse_filter_pair(filter: &str) -> anyhow::Result<(String, String)> {
         ));
     }
     Ok((parts[0].to_string(), parts[1].to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_filter_pair_splits_field_and_value() {
+        let result = parse_filter_pair("category:Images").unwrap();
+        assert_eq!(result, ("category".to_string(), "Images".to_string()));
+    }
+
+    #[test]
+    fn parse_filter_pair_rejects_missing_colon() {
+        let err = parse_filter_pair("invalid").unwrap_err();
+        assert!(err.to_string().contains("field:value"));
+    }
+
+    #[test]
+    fn parse_filter_pair_rejects_empty_value_side() {
+        let err = parse_filter_pair("field:").unwrap_err();
+        assert!(err.to_string().contains("field:value"));
+    }
+
+    #[test]
+    fn parse_filter_pair_handles_multiple_colons() {
+        let result = parse_filter_pair("field:value:extra").unwrap();
+        assert_eq!(result, ("field".to_string(), "value:extra".to_string()));
+    }
 }
 
 #[tokio::main]

@@ -167,4 +167,82 @@ mod tests {
         assert!(citations.contains("\"Kauri\" (1900), *Partner*"));
         assert!(citations.contains("<https://example.test/1>"));
     }
+
+    #[test]
+    fn test_deduplicate_empty_list() {
+        let records: Vec<Record> = vec![];
+        let deduped = deduplicate_records(&records);
+        assert!(deduped.is_empty());
+    }
+
+    #[test]
+    fn test_deduplicate_all_duplicates() {
+        let records = vec![
+            record("1", "Same Title", Some("1900")),
+            record("2", "Same Title", Some("1901")),
+            record("3", "Same Title", Some("1902")),
+        ];
+        let deduped = deduplicate_records(&records);
+        assert_eq!(deduped.len(), 1);
+        assert_eq!(deduped[0].id, "1");
+    }
+
+    #[test]
+    fn test_rag_xml_empty_records() {
+        let xml = to_rag_xml(&[]);
+        assert!(xml.starts_with("<context_documents>"));
+        assert!(xml.ends_with("</context_documents>\n"));
+        // Should have no <document> elements
+        assert!(!xml.contains("<document"));
+    }
+
+    #[test]
+    fn test_rag_xml_missing_optional_fields() {
+        let record = Record {
+            id: "1".to_string(),
+            title: "Minimal Record".to_string(),
+            description: None,
+            content_partner: None,
+            date: None,
+            ..Record::default()
+        };
+        let xml = to_rag_xml(&[record]);
+
+        assert!(xml.contains("<document id=\"1\">"));
+        assert!(xml.contains("<title>Minimal Record</title>"));
+        // Optional fields with None should not appear
+        assert!(!xml.contains("<content_partner>"));
+        assert!(!xml.contains("<description>"));
+        assert!(!xml.contains("<dates>"));
+    }
+
+    #[test]
+    fn test_timeline_no_dates() {
+        let record = Record {
+            id: "1".to_string(),
+            title: "Dateless Record".to_string(),
+            date: None,
+            ..Record::default()
+        };
+        let timeline = generate_chronological_timeline(&[record]);
+        assert!(timeline.contains("No dates associated with these records."));
+    }
+
+    #[test]
+    fn test_citations_missing_fields() {
+        let record = Record {
+            id: "1".to_string(),
+            title: "Mystery Item".to_string(),
+            content_partner: None,
+            date: None,
+            source_url: None,
+            ..Record::default()
+        };
+        let citations = generate_citations(&[record]);
+
+        assert!(citations.contains("\"Mystery Item\""));
+        assert!(citations.contains("(n.d.)"));
+        assert!(citations.contains("*Unknown Partner*"));
+        assert!(citations.contains("<digitalnz.org>"));
+    }
 }

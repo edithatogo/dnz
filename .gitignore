@@ -5,3 +5,8 @@
 /cobertura.xml
 /tarpaulin-report.html
 /Cargo.lock
+
+# Local validation scratch
+/cargo*.txt
+/run_*.ps1
+/run_*.bat

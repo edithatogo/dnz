@@ -46,7 +46,7 @@ pub enum Commands {
         direction: String,
 
         /// Geographical bounding box coordinates (North,West,South,East).
-        #[arg(long, value_parser = parse_bbox)]
+        #[arg(long, value_parser = parse_bbox, allow_hyphen_values = true)]
         bbox: Option<[f64; 4]>,
 
         /// Filter in field:value format (can be specified multiple times).
@@ -64,7 +64,7 @@ pub enum Commands {
         text: String,
 
         /// Comma-separated fields to facet by (e.g. category,collection).
-        #[arg(short, long, value_delimiter = ',')]
+        #[arg(long, value_delimiter = ',')]
         fields: Vec<String>,
 
         /// Facet term page.
@@ -199,4 +199,43 @@ fn find_on_path(tool: &str) -> Option<PathBuf> {
             None
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_bbox_valid() {
+        let result = parse_bbox("1.0,2.0,3.0,4.0");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), [1.0, 2.0, 3.0, 4.0]);
+    }
+
+    #[test]
+    fn test_parse_bbox_invalid_count() {
+        let result = parse_bbox("1,2,3");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("exactly 4"));
+    }
+
+    #[test]
+    fn test_parse_bbox_invalid_number() {
+        let result = parse_bbox("1,abc,3,4");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_workspace_diagnostics_returns_checks() {
+        let checks = workspace_diagnostics();
+
+        let names: Vec<&str> = checks.iter().map(|c| c.name).collect();
+        assert!(names.contains(&"workspace_path"));
+        assert!(names.contains(&"target_write"));
+        assert!(names.contains(&"digitalnz_api_key"));
+        assert!(names.contains(&"cargo_on_path"));
+        assert!(names.contains(&"rustc_on_path"));
+        assert!(names.contains(&"linker_on_path"));
+        assert_eq!(checks.len(), 6);
+    }
 }

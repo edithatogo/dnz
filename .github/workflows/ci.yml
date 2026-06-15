@@ -48,9 +48,9 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-package-metadata.ps1
 
-      - name: Install Cargo Tarpaulin
-        run: cargo install cargo-tarpaulin
+      - name: Install Cargo LLVM Cov
+        run: cargo install cargo-llvm-cov
 
       - name: Run Tests & Measure Coverage
-        run: |
-          cargo tarpaulin --verbose --workspace --all-features --out Xml --fail-under 90
+        shell: pwsh
+        run: ./scripts/coverage.ps1

@@ -51,6 +51,7 @@
 ---
 ## [~] Track 13: Hardening, Coverage & Registry Submission
 - Folder: [hardening-coverage-registry-submission](./tracks/hardening-coverage-registry-submission)
+- Status: 3/4 tasks complete. Task 13.4 ✅ (Python wheel verification scripted). Task 13.1 ✅ (secrets mapped). Task 13.3 ✅ (vector search optimized). Task 13.2 [~] (tests added; coverage run blocked by local linker/disk).
 
 ---
 ## [x] Track 14: Workspace Diagnostics, Audits & Pre-commit Hooks
