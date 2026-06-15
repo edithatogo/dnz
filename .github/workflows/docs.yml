@@ -1,0 +1,35 @@
+name: Docs
+
+on:
+  pull_request:
+  push:
+    branches: [main, master, 'codex/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    name: Astro docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install docs dependencies
+        run: npm install --prefix docs --no-audit --no-fund
+
+      - name: Check docs
+        run: npm run docs:check
+
+      - name: Build docs
+        run: npm run docs:build
