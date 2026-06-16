@@ -6,6 +6,7 @@ build-backend = "maturin"
 name = "dnz"
 version = "0.1.0"
 description = "High-performance Python client wrapper for the DigitalNZ API built in Rust"
+readme = "../../README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 classifiers = [
