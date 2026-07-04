@@ -9,7 +9,7 @@ This document details the release, packaging, and registry publication workflows
 | Component | Target Registry | Package Format | Distribution Mechanism |
 | :--- | :--- | :--- | :--- |
 | **`dnz-core`** | Crates.io | Rust Library Crate | `cargo publish` |
-| **`dnz-cli`** | GitHub Releases / Homebrew / WinGet | Pre-compiled native binaries | `cargo-dist` / Homebrew Formula / WinGet Manifest |
+| **`dnz-cli`** | GitHub Releases / Homebrew / WinGet | Pre-compiled native binaries | GitHub Actions release matrix / Homebrew Formula / WinGet Manifest |
 | **`dnz-mcp`** | MCP Registry | Stdio Binary | Registered at [glam-mcp](https://github.com/modelcontextprotocol/servers) |
 | **`dnz-python`** | PyPI (Python Package Index) | Maturin Wheel Binary | `maturin publish` |
 | **`docs`** | GitHub Pages / Cloudflare Pages | HTML / CSS | `astro build` + Actions Deploy |

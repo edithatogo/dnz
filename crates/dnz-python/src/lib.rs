@@ -93,7 +93,7 @@ impl PyQueryBuilder {
 
     /// Run the search query and return results as a JSON string.
     pub fn send(&self, py: Python<'_>) -> PyResult<String> {
-        py.allow_threads(|| {
+        py.detach(|| {
             let rt = tokio::runtime::Runtime::new()
                 .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
@@ -133,7 +133,7 @@ impl PyQueryBuilder {
 
 /// The dnz python module definition.
 #[pymodule]
-fn dnz(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn dnz(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyClient>()?;
     m.add_class::<PyQueryBuilder>()?;
     Ok(())

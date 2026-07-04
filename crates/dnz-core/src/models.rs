@@ -30,22 +30,31 @@ pub struct Record {
     /// Main title of the item.
     pub title: String,
     /// Detailed description.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Collections this item belongs to.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub collection: Option<Vec<String>>,
     /// Content partner institutions.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub content_partner: Option<Vec<String>>,
     /// Creator names.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub creator: Option<Vec<String>>,
     /// Display URL in DigitalNZ.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub display_url: Option<String>,
     /// Original URL from source system.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub source_url: Option<String>,
     /// General categories.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<Vec<String>>,
     /// Dates associated with the item.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub date: Option<Vec<String>>,
     /// Syndication timestamps.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub syndication_date: Option<String>,
 }
 

@@ -11,6 +11,7 @@ pub trait IntoDataFrame {
 
 impl IntoDataFrame for Vec<Record> {
     fn into_dataframe(self) -> Result<DataFrame, PolarsError> {
+        let height = self.len();
         let mut ids = Vec::with_capacity(self.len());
         let mut titles = Vec::with_capacity(self.len());
         let mut descriptions = Vec::with_capacity(self.len());
@@ -29,19 +30,22 @@ impl IntoDataFrame for Vec<Record> {
             categories.push(rec.category.map(|v| v.join(", ")).unwrap_or_default());
         }
 
-        let id_series = Series::new("id", ids);
-        let title_series = Series::new("title", titles);
-        let desc_series = Series::new("description", descriptions);
-        let partner_series = Series::new("content_partner", content_partners);
-        let category_series = Series::new("category", categories);
+        let id_series = Series::new("id".into(), ids);
+        let title_series = Series::new("title".into(), titles);
+        let desc_series = Series::new("description".into(), descriptions);
+        let partner_series = Series::new("content_partner".into(), content_partners);
+        let category_series = Series::new("category".into(), categories);
 
-        DataFrame::new(vec![
-            id_series,
-            title_series,
-            desc_series,
-            partner_series,
-            category_series,
-        ])
+        DataFrame::new(
+            height,
+            vec![
+                id_series.into(),
+                title_series.into(),
+                desc_series.into(),
+                partner_series.into(),
+                category_series.into(),
+            ],
+        )
     }
 }
 
