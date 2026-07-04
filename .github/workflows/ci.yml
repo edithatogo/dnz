@@ -35,7 +35,9 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
       - name: Install Cargo Audit
-        run: cargo install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
 
       - name: Run Dependency Audit
         run: cargo audit
@@ -49,7 +51,9 @@ jobs:
         run: ./scripts/validate-package-metadata.ps1
 
       - name: Install Cargo LLVM Cov
-        run: cargo install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
 
       - name: Run Tests & Measure Coverage
         shell: pwsh
