@@ -14,6 +14,14 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub api_key: Option<String>,
 
+    /// SQLite cache file. Defaults to DNZ_CACHE_PATH when set.
+    #[arg(long, global = true, env = "DNZ_CACHE_PATH")]
+    pub cache_path: Option<PathBuf>,
+
+    /// Log output format.
+    #[arg(long, global = true, value_enum, default_value_t = LogFormat::Text)]
+    pub log_format: LogFormat,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -92,6 +100,12 @@ pub enum Format {
     Json,
     Markdown,
     Text,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LogFormat {
+    Text,
+    Json,
 }
 
 pub fn parse_bbox(s: &str) -> Result<[f64; 4], String> {
@@ -237,5 +251,21 @@ mod tests {
         assert!(names.contains(&"rustc_on_path"));
         assert!(names.contains(&"linker_on_path"));
         assert_eq!(checks.len(), 6);
+    }
+
+    #[test]
+    fn test_cli_parses_global_cache_and_json_logging() {
+        let cli = Cli::parse_from([
+            "dnz",
+            "--cache-path",
+            "cache.sqlite",
+            "--log-format",
+            "json",
+            "ping",
+        ]);
+
+        assert_eq!(cli.cache_path, Some(PathBuf::from("cache.sqlite")));
+        assert_eq!(cli.log_format, LogFormat::Json);
+        assert!(matches!(cli.command, Commands::Ping));
     }
 }

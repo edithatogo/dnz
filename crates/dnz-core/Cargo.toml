@@ -21,6 +21,7 @@ anyhow = { workspace = true }
 nutype = { workspace = true }
 polars = { workspace = true }
 rand = { workspace = true }
+rusqlite = { workspace = true }
 
 [dev-dependencies]
 wiremock = { workspace = true }

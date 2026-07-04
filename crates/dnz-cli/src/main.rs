@@ -2,9 +2,9 @@
 
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use dnz_cli::{workspace_diagnostics, Cli, Commands, Format};
+use dnz_cli::{workspace_diagnostics, Cli, Commands, Format, LogFormat};
 use dnz_core::Client;
-use std::env;
+use std::{env, path::PathBuf};
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -16,36 +16,15 @@ fn parse_filter_pair(filter: &str) -> anyhow::Result<(String, String)> {
             filter
         ));
     }
-    Ok((parts[0].to_string(), parts[1].to_string()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_filter_pair_splits_field_and_value() {
-        let result = parse_filter_pair("category:Images").unwrap();
-        assert_eq!(result, ("category".to_string(), "Images".to_string()));
+    let field = parts[0].trim();
+    let value = parts[1].trim();
+    if field.is_empty() || value.is_empty() {
+        return Err(anyhow!(
+            "Filter must be in 'field:value' format, got '{}'",
+            filter
+        ));
     }
-
-    #[test]
-    fn parse_filter_pair_rejects_missing_colon() {
-        let err = parse_filter_pair("invalid").unwrap_err();
-        assert!(err.to_string().contains("field:value"));
-    }
-
-    #[test]
-    fn parse_filter_pair_rejects_empty_value_side() {
-        let err = parse_filter_pair("field:").unwrap_err();
-        assert!(err.to_string().contains("field:value"));
-    }
-
-    #[test]
-    fn parse_filter_pair_handles_multiple_colons() {
-        let result = parse_filter_pair("field:value:extra").unwrap();
-        assert_eq!(result, ("field".to_string(), "value:extra".to_string()));
-    }
+    Ok((field.to_string(), value.to_string()))
 }
 
 #[tokio::main]
@@ -53,10 +32,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
 
     let log_level = if args.verbose { "debug" } else { "info" };
-    tracing_subscriber::registry()
-        .with(fmt::layer().with_writer(std::io::stderr))
-        .with(EnvFilter::new(log_level))
-        .init();
+    init_logging(args.log_format, log_level);
 
     info!("Initializing DigitalNZ CLI Command...");
 
@@ -90,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
             and_filters,
             or_filters,
         } => {
-            let client = Client::new(resolve_api_key(args.api_key)?);
+            let client = build_client(resolve_api_key(args.api_key)?, args.cache_path.clone())?;
             let mut query = client.search(text).page(page).per_page(limit);
 
             if let Some(s) = sort {
@@ -151,7 +127,7 @@ async fn main() -> anyhow::Result<()> {
             limit,
             format,
         } => {
-            let client = Client::new(resolve_api_key(args.api_key)?);
+            let client = build_client(resolve_api_key(args.api_key)?, args.cache_path.clone())?;
             let mut query = client
                 .search(text)
                 .page(1)
@@ -191,4 +167,76 @@ fn resolve_api_key(api_key: Option<String>) -> anyhow::Result<String> {
         .ok_or_else(|| {
             anyhow!("API Key missing. Set DIGITALNZ_API_KEY environment variable or pass --api-key")
         })
+}
+
+fn build_client(api_key: String, cache_path: Option<PathBuf>) -> anyhow::Result<Client> {
+    let client = Client::new(api_key);
+    if let Some(path) = cache_path {
+        client.with_cache_path(path)
+    } else {
+        Ok(client)
+    }
+}
+
+fn init_logging(log_format: LogFormat, log_level: &str) {
+    let filter = EnvFilter::new(log_level);
+    match log_format {
+        LogFormat::Text => tracing_subscriber::registry()
+            .with(fmt::layer().with_writer(std::io::stderr))
+            .with(filter)
+            .init(),
+        LogFormat::Json => tracing_subscriber::registry()
+            .with(fmt::layer().json().with_writer(std::io::stderr))
+            .with(filter)
+            .init(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_filter_pair_splits_field_and_value() {
+        let result = parse_filter_pair("category:Images").unwrap();
+        assert_eq!(result, ("category".to_string(), "Images".to_string()));
+    }
+
+    #[test]
+    fn parse_filter_pair_rejects_missing_colon() {
+        let err = parse_filter_pair("invalid").unwrap_err();
+        assert!(err.to_string().contains("field:value"));
+    }
+
+    #[test]
+    fn parse_filter_pair_rejects_empty_value_side() {
+        let err = parse_filter_pair("field:").unwrap_err();
+        assert!(err.to_string().contains("field:value"));
+    }
+
+    #[test]
+    fn parse_filter_pair_handles_multiple_colons() {
+        let result = parse_filter_pair("field:value:extra").unwrap();
+        assert_eq!(result, ("field".to_string(), "value:extra".to_string()));
+    }
+
+    #[test]
+    fn build_client_initializes_persistent_cache() {
+        let cache_path = std::env::temp_dir().join(format!(
+            "dnz-cli-cache-{}-{}.sqlite",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock should be after unix epoch")
+                .as_nanos()
+        ));
+
+        let client = build_client("key".to_string(), Some(cache_path.clone()))
+            .expect("client should initialize persistent cache");
+
+        client.clear_cache();
+        assert!(cache_path.is_file());
+
+        let _ = std::fs::remove_file(cache_path);
+    }
 }

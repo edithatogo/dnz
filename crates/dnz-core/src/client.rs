@@ -1,8 +1,10 @@
 //! Client and query builder implementations for the DigitalNZ API.
 
+use crate::cache::PersistentCache;
 use crate::models::SearchResponse;
 use reqwest::Client as HttpClient;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tracing::{debug, warn};
@@ -15,6 +17,7 @@ pub struct Client {
     http_client: HttpClient,
     // Thread-safe query cache
     cache: Arc<Mutex<HashMap<String, SearchResponse>>>,
+    persistent_cache: Option<PersistentCache>,
 }
 
 impl Client {
@@ -25,6 +28,7 @@ impl Client {
             base_url: "https://api.digitalnz.org/v3/records.json".to_string(),
             http_client: HttpClient::new(),
             cache: Arc::new(Mutex::new(HashMap::new())),
+            persistent_cache: None,
         }
     }
 
@@ -34,10 +38,21 @@ impl Client {
         self
     }
 
+    /// Enable SQLite-backed cache storage for responses across sessions.
+    pub fn with_cache_path(mut self, cache_path: impl Into<PathBuf>) -> anyhow::Result<Self> {
+        self.persistent_cache = Some(PersistentCache::new(cache_path)?);
+        Ok(self)
+    }
+
     /// Clear cache entries.
     pub fn clear_cache(&self) {
         if let Ok(mut c) = self.cache.lock() {
             c.clear();
+        }
+        if let Some(cache) = &self.persistent_cache {
+            if let Err(err) = cache.clear() {
+                warn!(error = ?err, "Failed to clear persistent cache");
+            }
         }
     }
 
@@ -50,8 +65,21 @@ impl Client {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
     use wiremock::matchers::{method, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn temp_cache_path(name: &str) -> PathBuf {
+        let unique = format!(
+            "dnz-client-cache-{name}-{}-{}.sqlite",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock should be after unix epoch")
+                .as_nanos()
+        );
+        std::env::temp_dir().join(unique)
+    }
 
     #[test]
     fn per_page_clamps_to_api_bounds() {
@@ -132,6 +160,76 @@ mod tests {
         let result2 = client.search("kauri").send().await.unwrap();
         assert_eq!(result2.search.result_count, 1);
         assert_eq!(result2.search.results[0].id, "1");
+    }
+
+    #[tokio::test]
+    async fn persistent_cache_is_reused_across_client_instances() {
+        let mock_server = MockServer::start().await;
+        let cache_path = temp_cache_path("reuse");
+
+        let response_body = serde_json::json!({
+            "search": {
+                "result_count": 1,
+                "results": [
+                    { "id": "1", "title": "Persisted Record" }
+                ],
+                "facets": {}
+            }
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("text", "kauri"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let first_client = Client::new("first-key")
+            .with_base_url(mock_server.uri())
+            .with_cache_path(&cache_path)
+            .expect("persistent cache should initialize");
+        let first_result = first_client.search("kauri").send().await.unwrap();
+        assert_eq!(first_result.search.results[0].title, "Persisted Record");
+
+        let second_client = Client::new("second-key")
+            .with_base_url(mock_server.uri())
+            .with_cache_path(&cache_path)
+            .expect("persistent cache should initialize");
+        let second_result = second_client.search("kauri").send().await.unwrap();
+        assert_eq!(second_result.search.results[0].title, "Persisted Record");
+
+        let _ = std::fs::remove_file(cache_path);
+    }
+
+    #[test]
+    fn cache_key_excludes_api_key_value() {
+        let builder = Client::new("secret-key").search("kauri");
+        let query_params = vec![
+            ("api_key".to_string(), "secret-key".to_string()),
+            ("text".to_string(), "kauri".to_string()),
+        ];
+
+        let cache_key = builder.cache_key(&query_params);
+
+        assert!(!cache_key.contains("secret-key"));
+        assert!(cache_key.contains("kauri"));
+    }
+
+    #[test]
+    fn cache_key_canonicalizes_query_parameter_order() {
+        let builder = Client::new("secret-key").search("kauri");
+        let left = vec![
+            ("api_key".to_string(), "secret-key".to_string()),
+            ("text".to_string(), "kauri".to_string()),
+            ("and[category][]".to_string(), "Images".to_string()),
+        ];
+        let right = vec![
+            ("and[category][]".to_string(), "Images".to_string()),
+            ("text".to_string(), "kauri".to_string()),
+            ("api_key".to_string(), "different-key".to_string()),
+        ];
+
+        assert_eq!(builder.cache_key(&left), builder.cache_key(&right));
     }
 
     #[test]
@@ -368,13 +466,26 @@ impl QueryBuilder {
         }
 
         // Generate cache key
-        let cache_key = format!("{:?}_{:?}", self.client.base_url, query_params);
+        let cache_key = self.cache_key(&query_params);
 
         if self.use_cache {
             if let Ok(c) = self.client.cache.lock() {
                 if let Some(cached_resp) = c.get(&cache_key) {
                     debug!("Returning cached response for query");
                     return Ok(cached_resp.clone());
+                }
+            }
+            if let Some(cache) = &self.client.persistent_cache {
+                match cache.get(&cache_key) {
+                    Ok(Some(cached_resp)) => {
+                        debug!(cache_path = ?cache.path(), "Returning persistent cached response for query");
+                        if let Ok(mut c) = self.client.cache.lock() {
+                            c.insert(cache_key, cached_resp.clone());
+                        }
+                        return Ok(cached_resp);
+                    }
+                    Ok(None) => {}
+                    Err(err) => warn!(error = ?err, "Failed to read persistent cache"),
                 }
             }
         }
@@ -434,10 +545,25 @@ impl QueryBuilder {
 
         if self.use_cache {
             if let Ok(mut c) = self.client.cache.lock() {
-                c.insert(cache_key, response.clone());
+                c.insert(cache_key.clone(), response.clone());
+            }
+            if let Some(cache) = &self.client.persistent_cache {
+                if let Err(err) = cache.put(&cache_key, &response) {
+                    warn!(error = ?err, "Failed to write persistent cache");
+                }
             }
         }
 
         Ok(response)
+    }
+
+    fn cache_key(&self, query_params: &[(String, String)]) -> String {
+        let mut params_without_key: Vec<(&str, &str)> = query_params
+            .iter()
+            .filter(|(key, _)| key != "api_key")
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+            .collect();
+        params_without_key.sort_unstable();
+        format!("{:?}_{:?}", self.client.base_url, params_without_key)
     }
 }

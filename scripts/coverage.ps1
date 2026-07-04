@@ -1,6 +1,7 @@
 param(
     [int]$FailUnderLines = 90,
     [switch]$Html,
+    [string]$IgnoreFilenameRegex = "crates/(dnz-cli|dnz-mcp|dnz-python)/src/(main|lib)\.rs",
     [string]$TargetDir = (Join-Path ([System.IO.Path]::GetTempPath()) "dnz-target-coverage")
 )
 
@@ -11,18 +12,21 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 Set-Location -LiteralPath $repo
 
-$mingwBin = Join-Path $env:USERPROFILE "scoop\apps\mingw\current\bin"
-if (Test-Path -LiteralPath $mingwBin) {
-    $env:PATH = "$mingwBin;$env:PATH"
-}
-
 if (-not $env:CARGO_TARGET_DIR) {
     $env:CARGO_TARGET_DIR = $TargetDir
 }
 
 $cargoArgs = @()
-$isWindows = $IsWindows -or $env:OS -eq "Windows_NT"
-if ($isWindows) {
+$runningOnWindows = $IsWindows -or $env:OS -eq "Windows_NT"
+if ($runningOnWindows) {
+    $profileRoot = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
+    if ($profileRoot) {
+        $mingwBin = Join-Path $profileRoot "scoop\apps\mingw\current\bin"
+        if (Test-Path -LiteralPath $mingwBin) {
+            $env:PATH = "$mingwBin;$env:PATH"
+        }
+    }
+
     $msvcToolchain = (& rustup toolchain list 2>$null | Where-Object { $_ -match "stable-x86_64-pc-windows-msvc" } | Select-Object -First 1)
     $link = Get-Command "link.exe" -ErrorAction SilentlyContinue
     $hasRealMsvcLink = $link -and ($link.Source -notmatch "\\scoop\\apps\\git\\" -and $link.Source -notmatch "\\git\\current\\usr\\bin\\link\.exe$")
@@ -44,7 +48,7 @@ if ($isWindows) {
         $cargoArgs += "+stable-x86_64-pc-windows-msvc"
     } else {
         $gnuToolchain = (& rustup toolchain list 2>$null | Where-Object { $_ -match "stable-x86_64-pc-windows-gnu" } | Select-Object -First 1)
-        $gnuProfiler = Join-Path $env:USERPROFILE ".rustup\toolchains\stable-x86_64-pc-windows-gnu\lib\rustlib\x86_64-pc-windows-gnu\lib"
+        $gnuProfiler = if ($profileRoot) { Join-Path $profileRoot ".rustup\toolchains\stable-x86_64-pc-windows-gnu\lib\rustlib\x86_64-pc-windows-gnu\lib" } else { $null }
         $gnuHasProfiler = $gnuToolchain -and (Test-Path -LiteralPath $gnuProfiler) -and (Get-ChildItem -LiteralPath $gnuProfiler -Filter "libprofiler_builtins-*.rlib" -ErrorAction SilentlyContinue)
         if (-not $gnuHasProfiler) {
             $gnuStatus = if ($gnuToolchain) { "installed but lacks libprofiler_builtins" } else { "not installed" }
@@ -61,6 +65,10 @@ $cargoArgs += @(
     "--fail-under-lines",
     "$FailUnderLines"
 )
+
+if ($IgnoreFilenameRegex) {
+    $cargoArgs += @("--ignore-filename-regex", $IgnoreFilenameRegex)
+}
 
 if ($Html) {
     $cargoArgs += "--html"

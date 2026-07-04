@@ -14,9 +14,10 @@ This project is a high-performance integration hub and toolkit built in Rust. It
 
 ## 3. Product Features & Interfaces
 - **MCP Server (Rust-based):** A native, asynchronous MCP server implementing Model Context Protocol to expose DigitalNZ searches and facets to LLMs.
-- **Command Line Interface (CLI):** A compiled, modern CLI tool (`dnz-cli`) optimized for speed, supporting complex query composition, harvesting, and stdout JSON output.
+- **Command Line Interface (CLI):** A compiled, modern CLI tool (`dnz-cli`) optimized for speed, supporting complex query composition, persistent local caching, harvesting, and stdout JSON output.
 - **AI Agent Skills & Workflows:** Configuration-driven skills, workflows, and metadata schemas ready for submission to AI extension registries.
 - **Python / FFI bindings:** Potential exports of the core Rust API to Python or C-compatible FFI for integration into existing ecosystems (like the GLAM Workbench).
+- **Local analytics and RAG utilities:** Persistent query caching, local vector-search helpers, and on-demand embedding model artifact downloads for offline-friendly workflows.
 
 ## 4. Ecosystem & Registry Submissions
 The tools produced in this repository will be compiled, packaged, and submitted to:

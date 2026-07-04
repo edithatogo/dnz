@@ -100,11 +100,8 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // Logging is targeted strictly to standard error (stderr) to prevent breaking the stdio JSON-RPC stream
-    tracing_subscriber::registry()
-        .with(fmt::layer().with_writer(io::stderr))
-        .with(EnvFilter::new("info"))
-        .init();
+    // Logging is targeted strictly to standard error (stderr) to prevent breaking the stdio JSON-RPC stream.
+    init_logging();
 
     info!("Starting DigitalNZ MCP Server...");
 
@@ -117,7 +114,7 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let client = Client::new(api_key);
+    let client = build_client(api_key)?;
     let mut stdin = tokio::io::BufReader::new(tokio::io::stdin());
     let mut line = String::new();
 
@@ -184,6 +181,33 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn build_client(api_key: String) -> anyhow::Result<Client> {
+    let client = Client::new(api_key);
+    if let Ok(path) = env::var("DNZ_CACHE_PATH") {
+        client.with_cache_path(path)
+    } else {
+        Ok(client)
+    }
+}
+
+fn init_logging() {
+    let filter = EnvFilter::new(env::var("DNZ_LOG").unwrap_or_else(|_| "info".to_string()));
+    if env::var("DNZ_LOG_FORMAT")
+        .map(|value| value.eq_ignore_ascii_case("json"))
+        .unwrap_or(false)
+    {
+        tracing_subscriber::registry()
+            .with(fmt::layer().json().with_writer(io::stderr))
+            .with(filter)
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(fmt::layer().with_writer(io::stderr))
+            .with(filter)
+            .init();
+    }
 }
 
 async fn handle_request(
@@ -476,5 +500,26 @@ mod tests {
         let text = text_content(&response);
         assert!(text.contains("\"Images\": 7"));
         assert!(text.contains("\"Museum\": 2"));
+    }
+
+    #[test]
+    fn build_client_initializes_env_cache_path() {
+        let cache_path = std::env::temp_dir().join(format!(
+            "dnz-mcp-cache-{}-{}.sqlite",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock should be after unix epoch")
+                .as_nanos()
+        ));
+
+        std::env::set_var("DNZ_CACHE_PATH", &cache_path);
+        let client = build_client("key".to_string()).expect("client should initialize cache");
+        client.clear_cache();
+        std::env::remove_var("DNZ_CACHE_PATH");
+
+        assert!(cache_path.is_file());
+
+        let _ = std::fs::remove_file(cache_path);
     }
 }

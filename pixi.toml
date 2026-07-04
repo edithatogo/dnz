@@ -1,4 +1,4 @@
-[project]
+[workspace]
 name = "dnz-integration"
 version = "0.1.0"
 description = "DigitalNZ API integration in Rust"
@@ -8,17 +8,18 @@ platforms = ["win-64", "linux-64", "osx-64"]
 
 [dependencies]
 rust = ">=1.75"
-cargo-dist = ">=0.11.0"
+python = ">=3.12,<3.13"
 cargo-mutants = ">=24.0.0"
 cargo-llvm-cov = ">=0.6"
+cargo-audit = ">=0.22.1"
 openssl = ">=3.0"
 pkg-config = ">=0.29"
 
 [tasks]
-build = "cargo build"
-test = "cargo test"
+build = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-cargo.ps1 --% build"
+test = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-cargo.ps1 --% test"
 fmt = "cargo fmt --all"
-clippy = "cargo clippy --all-targets -- -D warnings"
+clippy = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-cargo.ps1 --% clippy --all-targets -- -D warnings"
 coverage = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/coverage.ps1"
 coverage-html = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/coverage.ps1 -Html"
 mutants = "cargo mutants"
@@ -28,7 +29,8 @@ install-hooks = "git config core.hooksPath .githooks"
 tmdl-docs = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tmdl-data-dictionary.ps1"
 tmdl-validate = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-tmdl.ps1"
 package-metadata = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-package-metadata.ps1 -AllowDirty"
-verify = { depends_on = ["fmt", "clippy", "test", "coverage", "audit", "doctor"] }
+verify-local = { depends-on = ["fmt", "clippy", "test", "audit", "doctor", "tmdl-validate", "package-metadata"] }
+verify = { depends-on = ["fmt", "clippy", "test", "coverage", "audit", "doctor"] }
 dry-run-cargo = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-cargo-publish-dryruns.ps1 -AllowDirty"
 dry-run-maturin = "maturin build --release --manifest-path crates/dnz-python/Cargo.toml"
 dry-run-python = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-python-wheel.ps1"
