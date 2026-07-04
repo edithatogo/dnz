@@ -16,8 +16,8 @@ if (-not $env:CARGO_TARGET_DIR) {
 }
 
 $cargoArgs = @()
-$isWindows = $IsWindows -or $env:OS -eq "Windows_NT"
-if ($isWindows) {
+$runningOnWindows = $IsWindows -or $env:OS -eq "Windows_NT"
+if ($runningOnWindows) {
     $profileRoot = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
     if ($profileRoot) {
         $mingwBin = Join-Path $profileRoot "scoop\apps\mingw\current\bin"
