@@ -56,6 +56,9 @@ pub struct Record {
     /// Syndication timestamps.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub syndication_date: Option<String>,
+    /// Provider-specific fields not yet modeled by dnz.
+    #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
+    pub extra_fields: HashMap<String, serde_json::Value>,
 }
 
 #[cfg(test)]
@@ -76,6 +79,7 @@ mod tests {
         assert!(record.category.is_none());
         assert!(record.date.is_none());
         assert!(record.syndication_date.is_none());
+        assert!(record.extra_fields.is_empty());
     }
 
     #[test]
@@ -103,7 +107,9 @@ mod tests {
                         "title": "Test Record",
                         "description": "A description",
                         "content_partner": ["Partner A"],
-                        "category": ["Images"]
+                        "category": ["Images"],
+                        "license": "CC-BY",
+                        "usage": "Some rights reserved"
                     }
                 ],
                 "facets": {
@@ -134,6 +140,14 @@ mod tests {
         assert!(response.search.results[0].creator.is_none());
         assert!(response.search.results[0].source_url.is_none());
         assert!(response.search.results[0].date.is_none());
+        assert_eq!(
+            response.search.results[0].extra_fields["license"],
+            serde_json::Value::String("CC-BY".to_string())
+        );
+        assert_eq!(
+            response.search.results[0].extra_fields["usage"],
+            serde_json::Value::String("Some rights reserved".to_string())
+        );
         let category_facets = &response.search.facets["category"];
         assert_eq!(category_facets.get("Images"), Some(&10));
         assert_eq!(category_facets.get("Text"), Some(&5));
@@ -153,6 +167,10 @@ mod tests {
             category: Some(vec!["Images".to_string()]),
             date: Some(vec!["1900".to_string()]),
             syndication_date: Some("2024-01-01".to_string()),
+            extra_fields: HashMap::from([(
+                "license".to_string(),
+                serde_json::Value::String("CC-BY".to_string()),
+            )]),
         };
         let json = serde_json::to_string(&record).unwrap();
         let deserialized: Record = serde_json::from_str(&json).unwrap();
@@ -182,6 +200,10 @@ mod tests {
         assert_eq!(deserialized.category, Some(vec!["Images".to_string()]));
         assert_eq!(deserialized.date, Some(vec!["1900".to_string()]));
         assert_eq!(deserialized.syndication_date.as_deref(), Some("2024-01-01"));
+        assert_eq!(
+            deserialized.extra_fields["license"],
+            serde_json::Value::String("CC-BY".to_string())
+        );
     }
 
     #[test]
@@ -198,6 +220,7 @@ mod tests {
             category: None,
             date: None,
             syndication_date: None,
+            extra_fields: HashMap::new(),
         };
         let json = serde_json::to_string(&rec).expect("serialize");
         assert!(!json.contains("description"));

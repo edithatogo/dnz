@@ -88,6 +88,37 @@ pub enum Commands {
         format: Format,
     },
 
+    /// Export New Zealand Gazette records as raw pages, JSONL records, and a manifest.
+    GazetteExport {
+        /// Output directory for records.jsonl, manifest.json, and raw pages.
+        #[arg(short, long)]
+        output: PathBuf,
+
+        /// Optional keyword query within New Zealand Gazette records.
+        #[arg(long, default_value = "")]
+        text: String,
+
+        /// First result page to export.
+        #[arg(long, default_value_t = 1)]
+        start_page: u32,
+
+        /// Maximum number of pages to export.
+        #[arg(long)]
+        max_pages: Option<u32>,
+
+        /// Count of records per page.
+        #[arg(short, long, default_value_t = 100)]
+        limit: u32,
+
+        /// Field name to sort by for deterministic paging.
+        #[arg(long, default_value = "date")]
+        sort: String,
+
+        /// Sort direction.
+        #[arg(long, default_value = "asc")]
+        direction: String,
+    },
+
     /// Verification check.
     Ping,
 

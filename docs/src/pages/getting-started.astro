@@ -28,6 +28,10 @@ cargo run --bin dnz-cli -- search "kiwi" --format json</code></pre>
     <p>Query collection facet distributions:</p>
     <pre><code>cargo run --bin dnz-cli -- facets "tui" --fields category,collection --format markdown</code></pre>
 
+    <p>Export New Zealand Gazette records with deterministic paging, raw page JSON, normalized JSONL records, and a manifest:</p>
+    <pre><code>cargo run --bin dnz-cli -- gazette-export --output exports/gazette --max-pages 10</code></pre>
+    <p>Gazette exports apply <code>primary_collection=New Zealand Gazette</code> automatically. They require a DigitalNZ API key from <code>DIGITALNZ_API_KEY</code> or <code>--api-key</code>; keys are used only for requests and are not written to export artifacts. The manifest records this access decision for downstream archive validation.</p>
+
     <h2>Starting the MCP Server (<code>dnz-mcp</code>)</h2>
     <p>Run the Model Context Protocol server over standard I/O (stdio) to interact with AI clients (e.g. Claude Desktop, Cline):</p>
     <pre><code>cargo run --bin dnz-mcp</code></pre>

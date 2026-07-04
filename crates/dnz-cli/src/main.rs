@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use dnz_cli::{workspace_diagnostics, Cli, Commands, Format, LogFormat};
-use dnz_core::Client;
+use dnz_core::{Client, GazetteExportConfig};
 use std::{env, path::PathBuf};
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -155,6 +155,33 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
             }
+        }
+        Commands::GazetteExport {
+            output,
+            text,
+            start_page,
+            max_pages,
+            limit,
+            sort,
+            direction,
+        } => {
+            let client = build_client(resolve_api_key(args.api_key)?, args.cache_path.clone())?;
+            let mut config = GazetteExportConfig::new(output);
+            config.text = text;
+            config.start_page = start_page;
+            config.max_pages = max_pages;
+            config.per_page = limit;
+            config.sort = if sort.trim().is_empty() {
+                None
+            } else {
+                Some(sort)
+            };
+            config.direction = direction;
+
+            let manifest = dnz_core::export_gazette(&client, config)
+                .await
+                .context("Failed to export New Zealand Gazette records")?;
+            println!("{}", serde_json::to_string_pretty(&manifest)?);
         }
     }
 

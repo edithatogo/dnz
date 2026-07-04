@@ -125,3 +125,46 @@ fn test_cli_parses_facets_and_doctor_commands() {
     let doctor = dnz_cli::Cli::parse_from(["dnz", "doctor"]);
     assert!(matches!(doctor.command, dnz_cli::Commands::Doctor));
 }
+
+#[test]
+fn test_cli_parses_gazette_export_command() {
+    let cli = dnz_cli::Cli::parse_from([
+        "dnz",
+        "gazette-export",
+        "--output",
+        "out/gazette",
+        "--text",
+        "notice",
+        "--start-page",
+        "2",
+        "--max-pages",
+        "3",
+        "--limit",
+        "50",
+        "--sort",
+        "date",
+        "--direction",
+        "desc",
+    ]);
+
+    match cli.command {
+        dnz_cli::Commands::GazetteExport {
+            output,
+            text,
+            start_page,
+            max_pages,
+            limit,
+            sort,
+            direction,
+        } => {
+            assert_eq!(output, std::path::PathBuf::from("out/gazette"));
+            assert_eq!(text, "notice");
+            assert_eq!(start_page, 2);
+            assert_eq!(max_pages, Some(3));
+            assert_eq!(limit, 50);
+            assert_eq!(sort, "date");
+            assert_eq!(direction, "desc");
+        }
+        other => panic!("expected gazette-export command, got {other:?}"),
+    }
+}

@@ -1,7 +1,14 @@
 //! Export routines generating open-science Frictionless and JSON-LD formats.
 
+use crate::client::Client;
 use crate::models::Record;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::fs::{self, File};
+use std::io::{BufWriter, Write};
+use std::path::{Path, PathBuf};
+
+const GAZETTE_COLLECTION: &str = "New Zealand Gazette";
 
 /// Generate a Frictionless Data Package descriptor (datapackage.json) for record sets.
 pub fn generate_frictionless_datapackage(
@@ -52,6 +59,177 @@ pub fn generate_schema_ld(records: &[Record], base_uri: &str) -> serde_json::Val
         "size": records.len(),
         "temporalCoverage": "1800/2026"
     })
+}
+
+/// Configuration for a deterministic New Zealand Gazette export.
+#[derive(Debug, Clone)]
+pub struct GazetteExportConfig {
+    pub output_dir: PathBuf,
+    pub text: String,
+    pub start_page: u32,
+    pub max_pages: Option<u32>,
+    pub per_page: u32,
+    pub sort: Option<String>,
+    pub direction: String,
+}
+
+impl GazetteExportConfig {
+    pub fn new(output_dir: impl Into<PathBuf>) -> Self {
+        Self {
+            output_dir: output_dir.into(),
+            text: String::new(),
+            start_page: 1,
+            max_pages: None,
+            per_page: 100,
+            sort: Some("date".to_string()),
+            direction: "asc".to_string(),
+        }
+    }
+}
+
+/// Summary written to `manifest.json` for downstream archive validation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GazetteExportManifest {
+    pub collection: String,
+    pub text: String,
+    pub start_page: u32,
+    pub per_page: u32,
+    pub sort: Option<String>,
+    pub direction: String,
+    pub total_results: u64,
+    pub pages_written: u32,
+    pub records_written: usize,
+    pub completed: bool,
+    pub files: GazetteExportFiles,
+    pub access: GazetteExportAccess,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GazetteExportFiles {
+    pub records_jsonl: String,
+    pub manifest_json: String,
+    pub raw_pages: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GazetteExportAccess {
+    pub api_key_required: bool,
+    pub anonymous_supported: bool,
+    pub api_key_source: String,
+    pub note: String,
+}
+
+/// Export Gazette pages as raw page JSON plus normalized record JSONL.
+pub async fn export_gazette(
+    client: &Client,
+    config: GazetteExportConfig,
+) -> anyhow::Result<GazetteExportManifest> {
+    if config.start_page == 0 {
+        anyhow::bail!("start_page must be 1 or greater");
+    }
+    if config.per_page == 0 {
+        anyhow::bail!("per_page must be 1 or greater");
+    }
+
+    fs::create_dir_all(&config.output_dir)?;
+    let pages_dir = config.output_dir.join("pages");
+    fs::create_dir_all(&pages_dir)?;
+
+    let records_path = config.output_dir.join("records.jsonl");
+    let manifest_path = config.output_dir.join("manifest.json");
+    let mut records_writer = BufWriter::new(File::create(&records_path)?);
+
+    let mut current_page = config.start_page;
+    let mut total_results = 0_u64;
+    let mut pages_written = 0_u32;
+    let mut records_written = 0_usize;
+    let mut raw_pages = Vec::new();
+    let mut completed = false;
+
+    loop {
+        if let Some(max_pages) = config.max_pages {
+            if pages_written >= max_pages {
+                break;
+            }
+        }
+
+        let mut query = client
+            .search(&config.text)
+            .page(current_page)
+            .per_page(config.per_page)
+            .and_filter("primary_collection", vec![GAZETTE_COLLECTION.to_string()]);
+
+        if let Some(sort) = &config.sort {
+            query = query.sort(sort, &config.direction);
+        }
+
+        let response = query.send().await?;
+        if pages_written == 0 {
+            total_results = response.search.result_count;
+        }
+
+        let raw_page_path = pages_dir.join(format!("page-{current_page:06}.json"));
+        write_pretty_json(&raw_page_path, &response)?;
+        raw_pages.push(relative_path(&config.output_dir, &raw_page_path));
+        pages_written += 1;
+
+        for record in &response.search.results {
+            serde_json::to_writer(&mut records_writer, record)?;
+            records_writer.write_all(b"\n")?;
+            records_written += 1;
+        }
+
+        let page_record_count = response.search.results.len() as u64;
+        let fetched_results =
+            (current_page - config.start_page) as u64 * config.per_page as u64 + page_record_count;
+        if page_record_count == 0 || fetched_results >= total_results {
+            completed = true;
+            break;
+        }
+
+        current_page += 1;
+    }
+    records_writer.flush()?;
+
+    let manifest = GazetteExportManifest {
+        collection: GAZETTE_COLLECTION.to_string(),
+        text: config.text,
+        start_page: config.start_page,
+        per_page: config.per_page.clamp(1, 100),
+        sort: config.sort,
+        direction: config.direction,
+        total_results,
+        pages_written,
+        records_written,
+        completed,
+        files: GazetteExportFiles {
+            records_jsonl: "records.jsonl".to_string(),
+            manifest_json: "manifest.json".to_string(),
+            raw_pages,
+        },
+        access: GazetteExportAccess {
+            api_key_required: true,
+            anonymous_supported: false,
+            api_key_source: "DIGITALNZ_API_KEY or --api-key".to_string(),
+            note: "dnz export commands use authenticated DigitalNZ API requests; API keys are never written to export artifacts.".to_string(),
+        },
+    };
+
+    write_pretty_json(&manifest_path, &manifest)?;
+    Ok(manifest)
+}
+
+fn write_pretty_json(path: &Path, value: &impl Serialize) -> anyhow::Result<()> {
+    let file = File::create(path)?;
+    serde_json::to_writer_pretty(file, value)?;
+    Ok(())
+}
+
+fn relative_path(root: &Path, path: &Path) -> String {
+    path.strip_prefix(root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
 }
 
 #[cfg(test)]
@@ -106,5 +284,132 @@ mod tests {
         assert_eq!(schema["@type"], "Dataset");
         assert_eq!(schema["size"], 0);
         assert_eq!(schema["url"], "https://example.test/empty");
+    }
+
+    #[tokio::test]
+    async fn gazette_export_writes_pages_records_and_manifest() {
+        use wiremock::matchers::{method, query_param};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+        let output_dir = std::env::temp_dir().join(format!(
+            "dnz-gazette-export-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock should be after unix epoch")
+                .as_nanos()
+        ));
+
+        Mock::given(method("GET"))
+            .and(query_param("text", ""))
+            .and(query_param("page", "1"))
+            .and(query_param("per_page", "2"))
+            .and(query_param("and[primary_collection][]", GAZETTE_COLLECTION))
+            .and(query_param("sort", "date"))
+            .and(query_param("direction", "asc"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "search": {
+                    "result_count": 3,
+                    "results": [
+                        { "id": "gaz-1", "title": "Gazette 1", "license": "CC-BY" },
+                        { "id": "gaz-2", "title": "Gazette 2", "usage": "open" }
+                    ]
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(query_param("text", ""))
+            .and(query_param("page", "2"))
+            .and(query_param("per_page", "2"))
+            .and(query_param("and[primary_collection][]", GAZETTE_COLLECTION))
+            .and(query_param("sort", "date"))
+            .and(query_param("direction", "asc"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "search": {
+                    "result_count": 3,
+                    "results": [
+                        { "id": "gaz-3", "title": "Gazette 3" }
+                    ]
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let client = Client::new("key").with_base_url(mock_server.uri());
+        let mut config = GazetteExportConfig::new(&output_dir);
+        config.per_page = 2;
+
+        let manifest = export_gazette(&client, config).await.unwrap();
+
+        assert_eq!(manifest.collection, GAZETTE_COLLECTION);
+        assert_eq!(manifest.total_results, 3);
+        assert_eq!(manifest.pages_written, 2);
+        assert_eq!(manifest.records_written, 3);
+        assert!(manifest.completed);
+        assert_eq!(
+            manifest.files.raw_pages,
+            vec!["pages/page-000001.json", "pages/page-000002.json"]
+        );
+        assert!(output_dir.join("pages/page-000001.json").is_file());
+
+        let jsonl = std::fs::read_to_string(output_dir.join("records.jsonl")).unwrap();
+        let lines: Vec<&str> = jsonl.lines().collect();
+        assert_eq!(lines.len(), 3);
+        assert!(lines[0].contains("\"license\":\"CC-BY\""));
+
+        let written_manifest: GazetteExportManifest = serde_json::from_str(
+            &std::fs::read_to_string(output_dir.join("manifest.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(written_manifest, manifest);
+
+        let _ = std::fs::remove_dir_all(output_dir);
+    }
+
+    #[tokio::test]
+    async fn gazette_export_can_stop_after_max_pages() {
+        use wiremock::matchers::{method, query_param};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+        let output_dir = std::env::temp_dir().join(format!(
+            "dnz-gazette-export-max-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock should be after unix epoch")
+                .as_nanos()
+        ));
+
+        Mock::given(method("GET"))
+            .and(query_param("page", "5"))
+            .and(query_param("and[primary_collection][]", GAZETTE_COLLECTION))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "search": {
+                    "result_count": 10,
+                    "results": [
+                        { "id": "gaz-5", "title": "Gazette 5" }
+                    ]
+                }
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let client = Client::new("key").with_base_url(mock_server.uri());
+        let mut config = GazetteExportConfig::new(&output_dir);
+        config.start_page = 5;
+        config.max_pages = Some(1);
+        config.per_page = 1;
+
+        let manifest = export_gazette(&client, config).await.unwrap();
+
+        assert_eq!(manifest.start_page, 5);
+        assert_eq!(manifest.pages_written, 1);
+        assert_eq!(manifest.records_written, 1);
+        assert!(!manifest.completed);
+
+        let _ = std::fs::remove_dir_all(output_dir);
     }
 }

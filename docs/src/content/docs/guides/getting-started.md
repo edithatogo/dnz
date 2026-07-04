@@ -39,6 +39,13 @@ Query collection facet distributions:
 cargo run --bin dnz-cli -- facets "tui" --fields category,collection --format markdown
 ```
 
+Export New Zealand Gazette records with deterministic paging, raw page JSON, normalized JSONL records, and a manifest:
+```bash
+cargo run --bin dnz-cli -- gazette-export --output exports/gazette --max-pages 10
+```
+
+Gazette exports apply `primary_collection=New Zealand Gazette` automatically. They require a DigitalNZ API key from `DIGITALNZ_API_KEY` or `--api-key`; keys are used only for requests and are not written to `manifest.json`, `records.jsonl`, or raw page files. The manifest records this access decision for downstream archive validation.
+
 ---
 
 ## Starting the MCP Server (`dnz-mcp`)
