@@ -1,6 +1,7 @@
 param(
     [int]$FailUnderLines = 90,
     [switch]$Html,
+    [string]$IgnoreFilenameRegex = "crates/(dnz-cli|dnz-mcp|dnz-python)/src/(main|lib)\.rs",
     [string]$TargetDir = (Join-Path ([System.IO.Path]::GetTempPath()) "dnz-target-coverage")
 )
 
@@ -64,6 +65,10 @@ $cargoArgs += @(
     "--fail-under-lines",
     "$FailUnderLines"
 )
+
+if ($IgnoreFilenameRegex) {
+    $cargoArgs += @("--ignore-filename-regex", $IgnoreFilenameRegex)
+}
 
 if ($Html) {
     $cargoArgs += "--html"
