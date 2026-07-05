@@ -15,9 +15,21 @@ if (-not $env:CARGO_TARGET_DIR) {
     $env:CARGO_TARGET_DIR = $TargetDir
 }
 
-$mingwBin = Join-Path $env:USERPROFILE "scoop\apps\mingw\current\bin"
-if (Test-Path -LiteralPath $mingwBin) {
-    $env:PATH = "$mingwBin;$env:PATH"
+$isWindows = $PSVersionTable.Platform -eq "Win32NT" -or $env:OS -eq "Windows_NT"
+$mingwBin = $null
+if ($isWindows -and $env:USERPROFILE) {
+    $mingwBin = Join-Path $env:USERPROFILE "scoop\apps\mingw\current\bin"
+    if (Test-Path -LiteralPath $mingwBin) {
+        $env:PATH = "$mingwBin;$env:PATH"
+    }
+}
+
+$gnuToolchain = $null
+if ($isWindows) {
+    $gnuToolchain = (& rustup toolchain list 2>$null | Where-Object { $_ -match "stable-x86_64-pc-windows-gnu" } | Select-Object -First 1)
+}
+if ($isWindows -and $gnuToolchain -and $mingwBin -and (Test-Path -LiteralPath $mingwBin)) {
+    $env:RUSTUP_TOOLCHAIN = "stable-x86_64-pc-windows-gnu"
 }
 
 if (-not $env:CARGO_BUILD_JOBS) {
@@ -47,9 +59,15 @@ if (-not $SkipBuild) {
     Write-Host "Building Python wheel with maturin..."
     $maturinArgs = @("build", "--release", "--manifest-path", "crates/dnz-python/Cargo.toml")
     if (-not $Python) {
-        $python312 = Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe"
-        if (Test-Path -LiteralPath $python312) {
-            $Python = $python312
+        $candidatePythons = @(
+            (Join-Path $repo ".pixi\envs\default\python.exe"),
+            (Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe")
+        )
+        foreach ($candidate in $candidatePythons) {
+            if (Test-Path -LiteralPath $candidate) {
+                $Python = $candidate
+                break
+            }
         }
     }
     if ($Python) {

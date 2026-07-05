@@ -13,8 +13,12 @@ Set-Location -LiteralPath $repo
 function Invoke-Cargo {
     param([string[]]$Arguments)
 
-    $toolchain = (& rustup toolchain list 2>$null | Where-Object { $_ -match "stable-x86_64-pc-windows-gnu" } | Select-Object -First 1)
-    if ($toolchain) {
+    $isWindows = $PSVersionTable.Platform -eq "Win32NT" -or $env:OS -eq "Windows_NT"
+    $toolchain = $null
+    if ($isWindows) {
+        $toolchain = (& rustup toolchain list 2>$null | Where-Object { $_ -match "stable-x86_64-pc-windows-gnu" } | Select-Object -First 1)
+    }
+    if ($isWindows -and $toolchain) {
         & cargo "+stable-x86_64-pc-windows-gnu" @Arguments
     } else {
         & cargo @Arguments
@@ -24,9 +28,12 @@ function Invoke-Cargo {
     }
 }
 
-$mingwBin = Join-Path $env:USERPROFILE "scoop\apps\mingw\current\bin"
-if (Test-Path -LiteralPath $mingwBin) {
-    $env:PATH = "$mingwBin;$env:PATH"
+$isWindowsHost = $PSVersionTable.Platform -eq "Win32NT" -or $env:OS -eq "Windows_NT"
+if ($isWindowsHost -and $env:USERPROFILE) {
+    $mingwBin = Join-Path $env:USERPROFILE "scoop\apps\mingw\current\bin"
+    if (Test-Path -LiteralPath $mingwBin) {
+        $env:PATH = "$mingwBin;$env:PATH"
+    }
 }
 
 if (-not $env:CARGO_TARGET_DIR) {

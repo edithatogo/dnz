@@ -26,10 +26,12 @@ Before tagging a release:
    - `crates/dnz-mcp/Cargo.toml`
    - `crates/dnz-python/Cargo.toml`
    - `docs/package.json`
+   - `crates/dnz-python/pyproject.toml`
 2. Run validation check suites:
    ```bash
-   pixi run clippy
-   pixi run test
+   pixi run verify-local
+   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-cargo-publish-dryruns.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-python-wheel.ps1
    ```
 
 ### Phase 2: Tagging & Release Compilations
@@ -40,9 +42,10 @@ Before tagging a release:
    ```
 2. **GitHub Actions Trigger:** The push event activates `.github/workflows/release.yml` which compiles native binaries for:
    - Windows (`x86_64`)
-   - macOS (`x86_64` & Apple Silicon)
+   - macOS (`x86_64`)
    - Linux (`x86_64`)
 3. The compiled binaries are automatically attached to the GitHub release page.
+4. If local packaging dry-runs are blocked by workstation network or linker state, record that explicitly and rely only on passing tag-triggered CI before making registry submissions.
 
 ### Phase 3: PyPI Publication (`dnz-python`)
 Maturin automates compilation of Python FFI wheels. To publish to PyPI:
