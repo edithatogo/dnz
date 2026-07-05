@@ -13,12 +13,12 @@ Set-Location -LiteralPath $repo
 function Invoke-Cargo {
     param([string[]]$Arguments)
 
-    $isWindows = $PSVersionTable.Platform -eq "Win32NT" -or $env:OS -eq "Windows_NT"
+    $runningOnWindows = $PSVersionTable.Platform -eq "Win32NT" -or $env:OS -eq "Windows_NT"
     $toolchain = $null
-    if ($isWindows) {
+    if ($runningOnWindows) {
         $toolchain = (& rustup toolchain list 2>$null | Where-Object { $_ -match "stable-x86_64-pc-windows-gnu" } | Select-Object -First 1)
     }
-    if ($isWindows -and $toolchain) {
+    if ($runningOnWindows -and $toolchain) {
         & cargo "+stable-x86_64-pc-windows-gnu" @Arguments
     } else {
         & cargo @Arguments
