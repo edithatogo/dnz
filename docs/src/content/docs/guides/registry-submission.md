@@ -9,6 +9,8 @@ title: Registry Submission
 ## Published
 
 - GitHub Release `v0.1.0`: CLI and MCP binaries for Linux, macOS, and Windows.
+- Install CLI from release assets: download the appropriate `dnz-*` binary for your platform from [v0.1.0](https://github.com/edithatogo/dnz/releases/tag/v0.1.0) and place it on your `PATH`.
+- Install MCP from release assets: download `dnz-mcp-0.1.0.mcpb` from [v0.1.0](https://github.com/edithatogo/dnz/releases/tag/v0.1.0) and use it with MCPB-compatible clients.
 
 ## Ready for Maintainer Credentials
 
@@ -35,6 +37,12 @@ The `v0.1.0` bundle is published at:
 The MCP Registry metadata validates with `mcp-publisher validate`. Live publication currently requires a fresh MCP Registry login.
 
 Smithery publication was attempted with the MCPB bundle and reached the registry, but Smithery returned a validation error. Track the live outcome in GitHub issue `#4`.
+
+## Glama And GitHub MCP
+
+Glama accepts open-source MCP servers directly from a GitHub repository. `dnz` has the minimal `glama.json` metadata file and a registry note at `registry/glama/README.md`, but live Glama review remains a manual step.
+
+No distinct public GitHub MCP Registry or Marketplace submission flow was confirmed, so that path remains deferred pending a documented GitHub process.
 
 ## Configuration
 

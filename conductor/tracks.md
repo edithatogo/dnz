@@ -72,6 +72,6 @@
 - Status: Complete. Defines the `dnz`-side compatibility contract for downstream `open_social_data` DigitalNZ provider work while keeping the standalone CLI, MCP server, cache, and package surfaces independent.
 
 ---
-## [ ] Track 18: Live Registry Submission and Verification
+## [x] Track 18: Live Registry Submission and Verification
 - Folder: [live-registry-submission-20260705](./tracks/live-registry-submission-20260705)
-- Status: New. Tracks actual external registry submission and verification for the released `dnz` CLI and MCP server, including GitHub Release evidence, crates.io, PyPI, official MCP Registry, GitHub MCP Registry/Marketplace, Smithery, Glama, and other credible MCP directories.
+- Status: Complete. Tracks actual external registry submission and verification for the released `dnz` CLI and MCP server, including GitHub Release evidence, crates.io, PyPI, official MCP Registry, GitHub MCP Registry/Marketplace, Smithery, Glama, and other credible MCP directories.
