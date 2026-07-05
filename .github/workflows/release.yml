@@ -17,14 +17,14 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
-            artifact_name: dnz-linux
             asset_name: dnz-linux-x86_64
+            mcp_asset_name: dnz-mcp-linux-x86_64
           - os: windows-latest
-            artifact_name: dnz-windows.exe
             asset_name: dnz-windows-x86_64.exe
+            mcp_asset_name: dnz-mcp-windows-x86_64.exe
           - os: macos-latest
-            artifact_name: dnz-mac
             asset_name: dnz-macos-x86_64
+            mcp_asset_name: dnz-mcp-macos-x86_64
 
     steps:
       - name: Checkout Code
@@ -37,17 +37,17 @@ jobs:
         uses: swatinem/rust-cache@v2
 
       - name: Compile Release Binaries
-        run: cargo build --release
+        run: cargo build --release -p dnz-cli -p dnz-mcp
 
       - name: Rename Artifacts
         shell: bash
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             mv target/release/dnz-cli.exe target/release/${{ matrix.asset_name }}
-            mv target/release/dnz-mcp.exe target/release/dnz-mcp-windows-x86_64.exe
+            mv target/release/dnz-mcp.exe target/release/${{ matrix.mcp_asset_name }}
           else
             mv target/release/dnz-cli target/release/${{ matrix.asset_name }}
-            mv target/release/dnz-mcp target/release/dnz-mcp-${{ matrix.os }}-x86_64
+            mv target/release/dnz-mcp target/release/${{ matrix.mcp_asset_name }}
           fi
 
       - name: Upload Release Assets
