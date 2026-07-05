@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "properties": {
+    "digitalnz_api_key": {
+      "type": "string",
+      "title": "DigitalNZ API key",
+      "description": "API key used for live DigitalNZ searches and facet requests."
+    },
+    "dnz_cache_path": {
+      "type": "string",
+      "title": "Optional cache path",
+      "description": "Optional SQLite cache file path for repeated DigitalNZ API calls."
+    },
+    "dnz_log": {
+      "type": "string",
+      "title": "Log level",
+      "description": "Optional diagnostics log level.",
+      "default": "info"
+    }
+  },
+  "required": [
+    "digitalnz_api_key"
+  ]
+}

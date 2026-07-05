@@ -9,13 +9,24 @@ The current release is installable from GitHub release assets, but the MCP serve
 | Target | Status | Notes |
 | --- | --- | --- |
 | GitHub Release | Published | `v0.1.0` includes CLI and MCP binaries for Linux, macOS, and Windows. |
-| crates.io | Ready for live publish decision | Dry-run checks exist; live publishing needs maintainer credentials and final crate ownership decision. |
-| PyPI | Ready for live publish decision | Wheel metadata checks exist; live publishing needs maintainer credentials. |
-| Official MCP Registry | Blocked by supported package/bundle path | The registry hosts metadata pointing to packages or remote servers. `dnz-mcp` needs a supported package path, such as MCPB, PyPI console script, npm wrapper, Docker/OCI image, or public remote endpoint. |
-| Smithery | Blocked by MCPB or remote HTTP endpoint | Smithery supports URL publishing for streamable HTTP servers and MCPB bundles for local stdio servers. |
+| crates.io | Credential blocked | Dry-run checks exist; `CARGO_REGISTRY_TOKEN` is not present in this environment. |
+| PyPI | Credential blocked | Wheel metadata checks exist; `PYPI_API_TOKEN` / `UV_PUBLISH_TOKEN` are not present in this environment. |
+| Official MCP Registry | Metadata valid; auth blocked | `mcp-publisher validate registry/mcp/server.draft.json` passes. Live publish needs a fresh MCP Registry login. |
+| Smithery | Submitted; rejected by registry validation | Authenticated publish reached Smithery, but the registry returned `400 Invalid input: expected object, received undefined`. |
 | Glama | Metadata prepared | `glama.json` is present for repository indexing; live listing still depends on Glama crawl/review or manual submission. |
 | GitHub MCP Registry / Marketplace | Needs path confirmation | Track as official MCP Registry and GitHub marketplace/curation once the available GitHub path is confirmed. |
 
 ## Recommended Next Artifact
 
-Create an MCPB bundle for `dnz-mcp` that wraps the released local stdio binary and declares `DIGITALNZ_API_KEY` as a secret configuration value. That bundle can become the common submission artifact for the official MCP Registry, Smithery, and downstream MCP directories that support local MCP packages.
+Build the MCPB bundle:
+
+```powershell
+pixi run mcpb
+```
+
+The bundle wraps the released local stdio binaries and declares `DIGITALNZ_API_KEY` as a secret configuration value.
+
+Published bundle:
+
+- URL: https://github.com/edithatogo/dnz/releases/download/v0.1.0/dnz-mcp-0.1.0.mcpb
+- SHA-256: `c06f3c4da99b24d3d70545df2e4c802f9d4ecbdb7f4323991d78d104deb41ee6`

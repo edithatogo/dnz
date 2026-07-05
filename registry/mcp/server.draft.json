@@ -9,12 +9,42 @@
     "url": "https://github.com/edithatogo/dnz",
     "source": "github"
   },
-  "packages": [],
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/edithatogo/dnz/releases/download/v0.1.0/dnz-mcp-0.1.0.mcpb",
+      "version": "0.1.0",
+      "fileSha256": "c06f3c4da99b24d3d70545df2e4c802f9d4ecbdb7f4323991d78d104deb41ee6",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "DIGITALNZ_API_KEY",
+          "description": "DigitalNZ API key used by search and facet tools.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "DNZ_CACHE_PATH",
+          "description": "Optional SQLite cache path for repeated DigitalNZ API calls.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "DNZ_LOG",
+          "description": "Optional log level for MCP server diagnostics.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ],
   "_meta": {
     "io.modelcontextprotocol.registry/publisher-provided": {
-      "status": "draft",
-      "blockedUntil": "A supported MCP package artifact or public remote endpoint exists.",
-      "preferredNextArtifact": "MCPB bundle for the released dnz-mcp stdio binary",
+      "status": "mcpb-ready",
+      "mcpbReleaseAsset": "https://github.com/edithatogo/dnz/releases/download/v0.1.0/dnz-mcp-0.1.0.mcpb",
+      "mcpbSha256": "c06f3c4da99b24d3d70545df2e4c802f9d4ecbdb7f4323991d78d104deb41ee6",
       "environmentVariables": [
         {
           "name": "DIGITALNZ_API_KEY",

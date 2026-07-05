@@ -1,4 +1,5 @@
 /target
+/dist
 /.pixi
 /mutants.out
 /*.lcov

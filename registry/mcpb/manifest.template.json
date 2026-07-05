@@ -1,0 +1,93 @@
+{
+  "manifest_version": "0.3",
+  "name": "dnz",
+  "display_name": "DigitalNZ",
+  "version": "0.1.0",
+  "description": "Search DigitalNZ records and facets through a local MCP server.",
+  "long_description": "DigitalNZ provides access to New Zealand cultural heritage records. This extension runs the dnz-mcp stdio server locally and exposes search and facet tools to MCP-compatible desktop clients.",
+  "author": {
+    "name": "edithatogo",
+    "url": "https://github.com/edithatogo"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edithatogo/dnz.git"
+  },
+  "homepage": "https://github.com/edithatogo/dnz",
+  "documentation": "https://github.com/edithatogo/dnz",
+  "support": "https://github.com/edithatogo/dnz/issues",
+  "server": {
+    "type": "binary",
+    "entry_point": "server/dnz-mcp-linux-x86_64",
+    "mcp_config": {
+      "command": "${__dirname}/server/dnz-mcp-linux-x86_64",
+      "env": {
+        "DIGITALNZ_API_KEY": "${user_config.digitalnz_api_key}",
+        "DNZ_CACHE_PATH": "${user_config.dnz_cache_path}",
+        "DNZ_LOG": "${user_config.dnz_log}"
+      },
+      "platform_overrides": {
+        "win32": {
+          "command": "${__dirname}/server/dnz-mcp-windows-x86_64.exe"
+        },
+        "darwin": {
+          "command": "${__dirname}/server/dnz-mcp-macos-x86_64"
+        },
+        "linux": {
+          "command": "${__dirname}/server/dnz-mcp-linux-x86_64"
+        }
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "search_digitalnz",
+      "description": "Search DigitalNZ collection records for cultural heritage items, images, records, and other digitised resources."
+    },
+    {
+      "name": "get_digitalnz_facets",
+      "description": "Harvest facet counts for DigitalNZ metadata fields such as category, collection, and content partner."
+    }
+  ],
+  "keywords": [
+    "digitalnz",
+    "new-zealand",
+    "cultural-heritage",
+    "glam",
+    "mcp",
+    "search"
+  ],
+  "license": "MIT",
+  "privacy_policies": [
+    "https://digitalnz.org/about/terms-of-use"
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ]
+  },
+  "user_config": {
+    "digitalnz_api_key": {
+      "type": "string",
+      "title": "DigitalNZ API key",
+      "description": "API key used for live DigitalNZ searches and facet requests.",
+      "sensitive": true,
+      "required": true
+    },
+    "dnz_cache_path": {
+      "type": "string",
+      "title": "Optional cache path",
+      "description": "Optional SQLite cache file path for repeated DigitalNZ API calls.",
+      "required": false
+    },
+    "dnz_log": {
+      "type": "string",
+      "title": "Log level",
+      "description": "Optional diagnostics log level.",
+      "required": false,
+      "default": "info"
+    }
+  }
+}
