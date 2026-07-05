@@ -10,3 +10,5 @@
 /cargo*.txt
 /run_*.ps1
 /run_*.bat
+/conductor/.tmp/
+__pycache__/
