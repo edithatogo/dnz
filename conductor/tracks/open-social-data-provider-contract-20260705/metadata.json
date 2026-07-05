@@ -1,0 +1,8 @@
+{
+  "track_id": "open-social-data-provider-contract-20260705",
+  "type": "chore",
+  "status": "new",
+  "created_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:00:00Z",
+  "description": "Define the dnz-side contract for Open Social Data DigitalNZ provider integration"
+}

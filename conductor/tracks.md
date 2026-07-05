@@ -65,3 +65,8 @@
 ---
 ## [x] Track 16: Semantic Docs & Conda-forge Packaging
 - Folder: [semantic-model-docs-conda-packaging](./tracks/semantic-model-docs-conda-packaging)
+
+---
+## [ ] Track 17: Open Social Data Provider Contract
+- Folder: [open-social-data-provider-contract-20260705](./tracks/open-social-data-provider-contract-20260705)
+- Status: New. Defines the `dnz`-side compatibility contract for downstream `open_social_data` DigitalNZ provider work while keeping the standalone CLI, MCP server, cache, and package surfaces independent.
