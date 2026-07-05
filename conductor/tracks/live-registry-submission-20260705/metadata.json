@@ -1,0 +1,8 @@
+{
+  "track_id": "live-registry-submission-20260705",
+  "type": "chore",
+  "status": "new",
+  "created_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:00:00Z",
+  "description": "Submit DNZ CLI and MCP server to live registries and verify publication evidence"
+}
