@@ -58,7 +58,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            target/release/dnz-*
+            target/release/${{ matrix.asset_name }}
+            target/release/${{ matrix.mcp_asset_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
