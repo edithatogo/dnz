@@ -64,16 +64,44 @@ Use this workflow for MCP servers/apps, CLIs, packages, containers, datasets, mo
 ## Phase 5a: Review and rejection capture (required)
 - Record review/rejection feedback for every failed submission attempt.
 - Capture submission status and feedback text in the owning repo’s `conductor/improvement-backlog.md` using a non-committing script invocation.
+- Use the same non-committing path for registry, review, and skills-feedback events so submission failures and reviewer feedback produce the same backlog surface.
 - Use a reviewer-only step to triage feedback and promote only validated lessons.
 - Required command example:
 
 ```bash
-python3 scripts/record_learning_candidate.py \
+python3 scripts/record_submission_event.py \
+  --kind registry \
   --backlog conductor/improvement-backlog.md \
-  --message "Registry submission rejected for <artifact> on <registry>" \
-  --evidence "workflow=${{ github.workflow }}" \
-  --evidence "run=${{ github.run_id }}" \
-  --evidence "artifacts=..."
+  --workflow "${{ github.workflow }}" \
+  --run-id "${{ github.run_id }}" \
+  --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+  --artifact "<artifact>" \
+  --target "<registry>" \
+  --feedback "<registry feedback summary>"
+```
+
+Examples for other event kinds:
+
+```bash
+python3 scripts/record_submission_event.py \
+  --kind review \
+  --backlog conductor/improvement-backlog.md \
+  --workflow "${{ github.workflow }}" \
+  --run-id "${{ github.run_id }}" \
+  --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+  --artifact "<artifact>" \
+  --target "<review queue>" \
+  --feedback "<review feedback summary>"
+
+python3 scripts/record_submission_event.py \
+  --kind skills-feedback \
+  --backlog conductor/improvement-backlog.md \
+  --workflow "${{ github.workflow }}" \
+  --run-id "${{ github.run_id }}" \
+  --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+  --artifact "<artifact>" \
+  --target "<skills feedback source>" \
+  --feedback "<skills feedback summary>"
 ```
 
 ## Suggested Local Validation Command
