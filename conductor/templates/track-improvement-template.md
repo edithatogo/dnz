@@ -19,10 +19,37 @@ Use this template for future track-specific retrospectives and evidence entries.
 ## Root cause summary
 - What failed and why
 
+## Phase retrospectives
+### Phase 1
+- Outcome:
+- Evidence:
+- Follow-up:
+
+### Phase 2
+- Outcome:
+- Evidence:
+- Follow-up:
+
+### Phase 3
+- Outcome:
+- Evidence:
+- Follow-up:
+
+### Phase 4
+- Outcome:
+- Evidence:
+- Follow-up:
+
 ## Repeat-prevention actions
 - Action
 - Owner
 - Verification
+
+## Reviewer sign-off
+- Reviewer:
+- Reviewed on:
+- Sign-off status:
+- Notes:
 
 ## Shared artifact updates
 - Template updates:
