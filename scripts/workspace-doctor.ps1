@@ -114,6 +114,34 @@ $freeBytes = if ($driveInfo) { $driveInfo.AvailableFreeSpace } else { (Get-PSDri
 $freeGb = [math]::Round($freeBytes / 1GB, 2)
 Add-Check "disk_free_gb" ($freeGb -ge 5) "$freeGb GB free"
 
+try {
+    $learningLog = Join-Path $repo "conductor\learning-log.md"
+    $learningSchema = Join-Path $repo "conductor\templates\learning-entry.schema.json"
+    $validator = Join-Path $repo "scripts\validate_learning_log.py"
+    $pythonExe = $null
+    $bundledPython = "C:\Users\60217257\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
+    if (Test-Path -LiteralPath $bundledPython) {
+        $pythonExe = $bundledPython
+    } else {
+        foreach ($candidate in @("python3", "python", "py")) {
+            $command = Get-Command $candidate -ErrorAction SilentlyContinue
+            if ($command -and ($command.CommandType -in @("Application", "ExternalScript")) -and $command.Source) {
+                $pythonExe = $command.Source
+                break
+            }
+        }
+    }
+
+    if ($pythonExe) {
+        & $pythonExe $validator --log $learningLog --schema $learningSchema | Out-Null
+        Add-Check "learning_log_schema" $true $learningLog
+    } else {
+        Add-Check "learning_log_schema" $false "$learningLog :: python interpreter not found"
+    }
+} catch {
+    Add-Check "learning_log_schema" $false "$learningLog :: $($_.Exception.Message)"
+}
+
 $checks | Format-Table -AutoSize
 
 $failed = @($checks | Where-Object { -not $_.ok })

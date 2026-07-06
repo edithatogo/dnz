@@ -1,8 +1,8 @@
 # Conductor Improvement Backlog
 
 ## Active candidates
-- [ ] Validate `conductor/learning-log.md` entries against `conductor/templates/learning-entry.schema.json` in CI or local pre-commit checks.
-- [ ] Add repository-scoped script to append learning candidates without automatic commit in CI failure paths.
+- [x] Validate `conductor/learning-log.md` entries against `conductor/templates/learning-entry.schema.json` in CI or local pre-commit checks.
+- [x] Add repository-scoped script to append learning candidates without automatic commit in CI failure paths.
 - [ ] Capture registry/review/skills-feedback events into the backlog from failing submission workflows.
 - [ ] Add phase-level retrospective notes for each Phase 1/2/3/4 run and record reviewer sign-off.
 

@@ -50,6 +50,9 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-package-metadata.ps1
 
+      - name: Validate Conductor Learning Log
+        run: python3 scripts/validate_learning_log.py
+
       - name: Install Cargo LLVM Cov
         uses: taiki-e/install-action@v2
         with:
