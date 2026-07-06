@@ -70,3 +70,7 @@
 ## [x] Track 17: Open Social Data Provider Contract
 - Folder: [open-social-data-provider-contract-20260705](./tracks/open-social-data-provider-contract-20260705)
 - Status: Complete. Defines the `dnz`-side compatibility contract for downstream `open_social_data` DigitalNZ provider work while keeping the standalone CLI, MCP server, cache, and package surfaces independent.
+
+---
+## [x] Track 18: API Docs & Collection Map
+- Folder: [api-docs-collection-map-20260707](./tracks/api-docs-collection-map-20260707)

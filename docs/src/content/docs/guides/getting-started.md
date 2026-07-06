@@ -39,6 +39,8 @@ Query collection facet distributions:
 cargo run --bin dnz-cli -- facets "tui" --fields category,collection --format markdown
 ```
 
+For a repo-local map of the API documentation surfaces and the major collections inventory derived from the checked-in facet exports, see [API Documentation Map](../generated/api-documentation-map.md) and [Major DigitalNZ Collections](../generated/digitalnz-major-collections.md).
+
 Export New Zealand Gazette records with deterministic paging, raw page JSON, normalized JSONL records, and a manifest:
 ```bash
 cargo run --bin dnz-cli -- gazette-export --output exports/gazette --max-pages 10
