@@ -72,5 +72,5 @@
 - Status: Complete. Defines the `dnz`-side compatibility contract for downstream `open_social_data` DigitalNZ provider work while keeping the standalone CLI, MCP server, cache, and package surfaces independent.
 
 ---
-## [ ] Track 18: API Docs & Collection Map
+## [x] Track 18: API Docs & Collection Map
 - Folder: [api-docs-collection-map-20260707](./tracks/api-docs-collection-map-20260707)

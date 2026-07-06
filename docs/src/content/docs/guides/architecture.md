@@ -5,6 +5,8 @@ description: Comprehensive structural layout of the DigitalNZ Rust Integration H
 
 This project leverages a multi-crate Cargo workspace to separate core API logic from interface boundaries and client integrations.
 
+For the published map of API documentation sources and the major collection inventory derived from repository artifacts, see [API Documentation Map](../generated/api-documentation-map.md) and [Major DigitalNZ Collections](../generated/digitalnz-major-collections.md).
+
 ## Directory Layout
 
 ```
