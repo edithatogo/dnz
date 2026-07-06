@@ -63,4 +63,4 @@ When changing `dnz`, check whether the change affects:
 
 - `dnz` contract issue: [#3](https://github.com/edithatogo/dnz/issues/3)
 - `dnz` live registry issue: [#4](https://github.com/edithatogo/dnz/issues/4)
-- `open_social_data` provider track: [Track 13](https://github.com/edithatogo/open_social_data/issues/5)
+- `open_social_data` provider track: completed in commit `b2eda94`; the downstream issues are now closed and archived.
