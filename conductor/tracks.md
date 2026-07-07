@@ -74,3 +74,7 @@
 ---
 ## [x] Track 18: API Docs & Collection Map
 - Folder: [api-docs-collection-map-20260707](./tracks/api-docs-collection-map-20260707)
+
+---
+## [ ] Track 19: Repository Alignment, Security Gates & Archival
+- Folder: [repo-alignment-security-archive-20260707](./tracks/repo-alignment-security-archive-20260707)

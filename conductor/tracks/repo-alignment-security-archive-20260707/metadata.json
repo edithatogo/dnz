@@ -1,0 +1,8 @@
+{
+  "track_id": "repo-alignment-security-archive-20260707",
+  "type": "chore",
+  "status": "new",
+  "created_at": "2026-07-07T12:17:27Z",
+  "updated_at": "2026-07-07T12:17:27Z",
+  "description": "Align GitHub Actions security gates, archive publication, and Conductor bookkeeping with adjacent repo conventions"
+}
