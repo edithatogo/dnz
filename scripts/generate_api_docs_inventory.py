@@ -30,6 +30,11 @@ def parse_args() -> argparse.Namespace:
         default="docs/src/content/docs/generated/digitalnz-major-collections.md",
         help="Path to write the major collections page.",
     )
+    parser.add_argument(
+        "--usage-source",
+        default="digitalnz/facets/usage_by_collection_and_partner.csv",
+        help="Path to the usage-by-collection facet export.",
+    )
     return parser.parse_args()
 
 
@@ -37,6 +42,15 @@ def read_collection_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     rows.sort(key=lambda row: int(row["count"]), reverse=True)
+    return rows
+
+
+def read_usage_rows(path: Path) -> list[dict[str, str]]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    allowed_usages = {"Use commercially", "Share", "Modify"}
+    rows = [row for row in rows if row["usage"] in allowed_usages]
+    rows.sort(key=lambda row: (int(row["count"]), int(row["items_total"])), reverse=True)
     return rows
 
 
@@ -74,28 +88,30 @@ def render_docs_map(entries: list[DocEntry]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_collections_page(rows: list[dict[str, str]], limit: int = 15) -> str:
+def render_collections_page(rows: list[dict[str, str]], limit: int = 25) -> str:
     selected = rows[:limit]
     lines = [
         "---",
         "title: Major DigitalNZ Collections",
-        "description: Major collection groups behind the DigitalNZ API, derived from checked-in facet exports.",
+        "description: Rights-safe major collection groups behind the DigitalNZ API, derived from checked-in facet exports.",
         "---",
         "",
         "# Major DigitalNZ Collections",
         "",
-        "This inventory is derived from `digitalnz/facets/collections_by_partner.csv` and corroborated by the collection visualisation artifacts under `digitalnz/`.",
+        "This inventory includes only usage rows whose checked-in facet is `Use commercially`, `Share`, or `Modify`.",
         "",
-        f"The table below lists the top {limit} collection groups by record count in the checked-in facet export.",
+        "It is derived from `digitalnz/facets/usage_by_collection_and_partner.csv` and corroborated by the collection visualisation artifacts under `digitalnz/`.",
+        "",
+        f"The table below lists the top {limit} permitted usage rows by rights-safe item count in the checked-in facet export.",
         "",
         "## Inventory",
         "",
-        "| Content partner | Primary collection | Record count | Source artifact |",
-        "|---|---|---:|---|",
+        "| Content partner | Primary collection | Usage | Rights-safe count | Items total | Usage total | Source artifact |",
+        "|---|---|---|---:|---:|---:|---|",
     ]
     for row in selected:
         lines.append(
-            f"| {row['content_partner']} | {row['primary_collection']} | {int(row['count']):,} | `digitalnz/facets/collections_by_partner.csv` |"
+            f"| {row['content_partner']} | {row['primary_collection']} | {row['usage']} | {int(row['count']):,} | {int(row['items_total']):,} | {int(row['usage_total']):,} | `digitalnz/facets/usage_by_collection_and_partner.csv` |"
         )
 
     lines.extend(
@@ -104,8 +120,8 @@ def render_collections_page(rows: list[dict[str, str]], limit: int = 15) -> str:
             "## Notes",
             "",
             "- Counts are snapshot counts from the checked-in facet export, not live API calls.",
-            "- The same content partner may appear more than once when it has multiple large collections.",
-            "- `digitalnz/open_collections_digitalnz.html` and `digitalnz/facets/usage_by_collection_and_partner.csv` provide supporting visualisation and usage context.",
+            "- The same content partner and collection may appear more than once when it has multiple permitted usage classes.",
+            "- `digitalnz/open_collections_digitalnz.html`, `digitalnz/facets/collections_by_partner.csv`, and `digitalnz/facets/rights.csv` provide supporting visualisation and rights context.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -204,8 +220,8 @@ def main() -> int:
 
     docs_map_path = repo_root / args.docs_map
     collections_path = repo_root / args.collections_page
-    collections_source = repo_root / "digitalnz" / "facets" / "collections_by_partner.csv"
-    collections_rows = read_collection_rows(collections_source)
+    collections_source = repo_root / "digitalnz" / "facets" / "usage_by_collection_and_partner.csv"
+    collections_rows = read_usage_rows(collections_source)
 
     docs_map_path.parent.mkdir(parents=True, exist_ok=True)
     collections_path.parent.mkdir(parents=True, exist_ok=True)
