@@ -16,6 +16,15 @@ The current release is installable from GitHub release assets, but the MCP serve
 | Glama | Metadata prepared | `glama.json` is present for repository indexing; live listing still depends on Glama crawl/review or manual submission. |
 | GitHub MCP Registry / Marketplace | Needs path confirmation | Track as official MCP Registry and GitHub marketplace/curation once the available GitHub path is confirmed. |
 
+## Archive Mirrors
+
+The notebook archive under `digitalnz/` now has workflow-backed metadata paths for public mirrors:
+
+| Target | Status | Notes |
+| --- | --- | --- |
+| Hugging Face | Metadata workflow configured | `digitalnz/DATASET_CARD.md` is staged by `.github/workflows/hf_metadata.yml` and can be uploaded once `HF_TOKEN` and `HF_REPO_ID` are set. |
+| Zenodo | Metadata workflow configured | `digitalnz/.zenodo.json` is staged by `.github/workflows/zenodo_publish.yml`; live deposition publication still requires a Zenodo token and manual confirmation. |
+
 ## Recommended Next Artifact
 
 Build the MCPB bundle:

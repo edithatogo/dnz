@@ -1,0 +1,111 @@
+name: Zenodo Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the Zenodo deposition after uploading metadata
+        required: true
+        default: false
+        type: boolean
+      confirm:
+        description: Type publish-zenodo-doi to publish a Zenodo DOI
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      INPUTS_PUBLISH: ${{ inputs.publish }}
+      INPUTS_CONFIRM: ${{ inputs.confirm || '' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install requests
+        run: python -m pip install --upgrade requests
+
+      - name: Create or publish Zenodo deposition
+        env:
+          ZENODO_TOKEN: ${{ secrets.ZENODO_TOKEN }}
+          ZENODO_SANDBOX_TOKEN: ${{ secrets.ZENODO_SANDBOX_TOKEN }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          import requests
+
+          metadata_path = Path("digitalnz/.zenodo.json")
+          if not metadata_path.exists():
+              raise SystemExit("digitalnz/.zenodo.json is required")
+
+          metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+          token = os.environ.get("ZENODO_TOKEN")
+          base_url = "https://zenodo.org/api"
+          if not token:
+              token = os.environ.get("ZENODO_SANDBOX_TOKEN")
+              base_url = "https://sandbox.zenodo.org/api"
+          if not token:
+              raise SystemExit("ZENODO_TOKEN or ZENODO_SANDBOX_TOKEN is required")
+
+          publish_root = Path("publish/zenodo")
+          if publish_root.exists():
+              shutil.rmtree(publish_root)
+          shutil.copytree("digitalnz", publish_root / "digitalnz")
+          (publish_root / "digitalnz" / "README.md").write_text(
+              Path("digitalnz/DATASET_CARD.md").read_text(encoding="utf-8"),
+              encoding="utf-8",
+          )
+
+          create = requests.post(
+              f"{base_url}/deposit/depositions",
+              params={"access_token": token},
+              json={"metadata": metadata},
+              timeout=60,
+          )
+          create.raise_for_status()
+          deposition = create.json()
+          bucket_url = deposition["links"]["bucket"]
+
+          for path in publish_root.rglob("*"):
+              if not path.is_file():
+                  continue
+              relative = path.relative_to(publish_root).as_posix()
+              with path.open("rb") as handle:
+                  upload = requests.put(
+                      f"{bucket_url}/{relative}",
+                      params={"access_token": token},
+                      data=handle,
+                      timeout=120,
+                  )
+              upload.raise_for_status()
+
+          if os.environ.get("INPUTS_PUBLISH", "false") == "true":
+              if os.environ.get("INPUTS_CONFIRM") != "publish-zenodo-doi":
+                  raise SystemExit("confirm must be publish-zenodo-doi to publish a DOI")
+              publish = requests.post(
+                  f"{base_url}/deposit/depositions/{deposition['id']}/actions/publish",
+                  params={"access_token": token},
+                  timeout=60,
+              )
+              publish.raise_for_status()
+
+          print(json.dumps({"deposition_id": deposition["id"], "bucket": bucket_url}, indent=2))
+          PY

@@ -1,0 +1,56 @@
+name: Hugging Face Metadata
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update-card:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Hugging Face client
+        run: python -m pip install --upgrade huggingface_hub
+
+      - name: Upload dataset archive
+        env:
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import shutil
+          from pathlib import Path
+
+          from huggingface_hub import HfApi
+
+          card = Path("digitalnz/DATASET_CARD.md")
+          if not card.exists():
+              raise SystemExit("digitalnz/DATASET_CARD.md is required")
+
+          publish_root = Path("publish/huggingface")
+          if publish_root.exists():
+              shutil.rmtree(publish_root)
+          shutil.copytree("digitalnz", publish_root / "digitalnz")
+          (publish_root / "README.md").write_text(card.read_text(encoding="utf-8"), encoding="utf-8")
+
+          HfApi().upload_folder(
+              folder_path=publish_root,
+              repo_id=os.environ["HF_REPO_ID"],
+              repo_type="dataset",
+              token=os.environ["HF_TOKEN"],
+              commit_message="docs: update dataset archive metadata",
+          )
+          PY
