@@ -30,4 +30,4 @@ This page maps the repository's API-related documentation sources into the publi
 
 - Start with the docs index and quickstart for end-user guidance.
 - Use the architecture and contract pages for boundary and integration detail.
-- Treat notebooks and CSVs under `digitalnz/` as historical source artifacts that back the published inventory pages.
+- Treat notebooks and CSVs under `digitalnz/` and the legacy source tree under `pydnz/` as historical source artifacts that back the published inventory pages and source archive snapshots.

@@ -37,14 +37,15 @@ jobs:
 
           from huggingface_hub import HfApi
 
-          card = Path("digitalnz/DATASET_CARD.md")
+          card = Path("SOURCE_ARCHIVE_CARD.md")
           if not card.exists():
-              raise SystemExit("digitalnz/DATASET_CARD.md is required")
+              raise SystemExit("SOURCE_ARCHIVE_CARD.md is required")
 
           publish_root = Path("publish/huggingface")
           if publish_root.exists():
               shutil.rmtree(publish_root)
-          shutil.copytree("digitalnz", publish_root / "digitalnz")
+          shutil.copytree("digitalnz", publish_root / "digitalnz", ignore=shutil.ignore_patterns(".git", ".gitmodules"))
+          shutil.copytree("pydnz", publish_root / "pydnz", ignore=shutil.ignore_patterns(".git", ".gitmodules"))
           (publish_root / "README.md").write_text(card.read_text(encoding="utf-8"), encoding="utf-8")
 
           HfApi().upload_folder(

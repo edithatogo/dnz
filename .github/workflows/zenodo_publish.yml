@@ -69,9 +69,10 @@ jobs:
           publish_root = Path("publish/zenodo")
           if publish_root.exists():
               shutil.rmtree(publish_root)
-          shutil.copytree("digitalnz", publish_root / "digitalnz")
-          (publish_root / "digitalnz" / "README.md").write_text(
-              Path("digitalnz/DATASET_CARD.md").read_text(encoding="utf-8"),
+          shutil.copytree("digitalnz", publish_root / "digitalnz", ignore=shutil.ignore_patterns(".git", ".gitmodules"))
+          shutil.copytree("pydnz", publish_root / "pydnz", ignore=shutil.ignore_patterns(".git", ".gitmodules"))
+          (publish_root / "README.md").write_text(
+              Path("SOURCE_ARCHIVE_CARD.md").read_text(encoding="utf-8"),
               encoding="utf-8",
           )
 
