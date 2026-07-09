@@ -1,6 +1,6 @@
 ---
 title: DigitalNZ Source Archive
-license: MIT
+license: mit
 language: eng
 ---
 

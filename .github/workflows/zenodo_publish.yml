@@ -72,9 +72,14 @@ jobs:
           shutil.copytree("digitalnz", publish_root / "digitalnz", ignore=shutil.ignore_patterns(".git", ".gitmodules"))
           shutil.copytree("pydnz", publish_root / "pydnz", ignore=shutil.ignore_patterns(".git", ".gitmodules"))
           shutil.copytree("rnz", publish_root / "rnz", ignore=shutil.ignore_patterns(".git", ".gitmodules"))
-          (publish_root / "README.md").write_text(
-              Path("SOURCE_ARCHIVE_CARD.md").read_text(encoding="utf-8"),
-              encoding="utf-8",
+          card_text = Path("SOURCE_ARCHIVE_CARD.md").read_text(encoding="utf-8")
+          (publish_root / "README.md").write_text(card_text, encoding="utf-8")
+          archive_path = Path(
+              shutil.make_archive(
+                  base_name=str(publish_root / "dnz-source-archive"),
+                  format="gztar",
+                  root_dir=publish_root,
+              )
           )
 
           create = requests.post(
@@ -87,13 +92,10 @@ jobs:
           deposition = create.json()
           bucket_url = deposition["links"]["bucket"]
 
-          for path in publish_root.rglob("*"):
-              if not path.is_file():
-                  continue
-              relative = path.relative_to(publish_root).as_posix()
+          for path in [publish_root / "README.md", archive_path]:
               with path.open("rb") as handle:
                   upload = requests.put(
-                      f"{bucket_url}/{relative}",
+                      f"{bucket_url}/{path.name}",
                       params={"access_token": token},
                       data=handle,
                       timeout=120,
