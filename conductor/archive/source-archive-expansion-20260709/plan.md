@@ -24,13 +24,15 @@
 - [x] Task: Update archive-facing docs.
   - [x] Clarify the expanded archive scope in `registry/README.md`.
   - [x] Ensure docs and registry notes still match the workflow behavior.
-- [ ] Task: Add the RNZ archive bundle.
-  - [ ] Create the `rnz/` source bundle from checked-in facet exports and associated documents.
-  - [ ] Mirror `rnz/` in the Hugging Face and Zenodo workflows.
-  - [ ] Update archive-facing docs so the RNZ bundle is discoverable.
-- [~] Task: Validate and record outcome.
+- [x] Task: Add the RNZ archive bundle.
+  - [x] Create the `rnz/` source bundle from checked-in facet exports and associated documents.
+  - [x] Mirror `rnz/` in the Hugging Face and Zenodo workflows.
+  - [x] Update archive-facing docs so the RNZ bundle is discoverable.
+  - Commit: `fc6ad10`
+- [x] Task: Validate and record outcome.
   - [x] Run quick checks on the modified packaging scripts.
   - [x] Note any remaining source trees that are intentionally out of scope.
-  - [ ] Update the track metadata when complete.
-  - Remaining validation: dispatch the HF and Zenodo workflows with the required credentials and confirm the live results for the DigitalNZ, pydnz, and RNZ bundles.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Documentation, RNZ Bundle, and Closeout' (Protocol in workflow.md)
+  - [x] Update the track metadata when complete.
+  - [x] Dispatch the HF and Zenodo workflows with the required credentials and confirm the live results for the DigitalNZ, pydnz, and RNZ bundles.
+  - Commit: `cbe65ee`, `ef8ac87`
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Documentation, RNZ Bundle, and Closeout' (Protocol in workflow.md)
