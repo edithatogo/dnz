@@ -76,9 +76,6 @@
 - Folder: [api-docs-collection-map-20260707](./tracks/api-docs-collection-map-20260707)
 
 ---
-## [ ] Track 19: Submission Convergence Loop
-- Folder: [submission-convergence-loop-20260707](./tracks/submission-convergence-loop-20260707)
-
 ---
 ## [ ] Track 20: DigitalNZ Handoff Notification
 - Folder: [digitalnz-handoff-notification-20260707](./tracks/digitalnz-handoff-notification-20260707)
