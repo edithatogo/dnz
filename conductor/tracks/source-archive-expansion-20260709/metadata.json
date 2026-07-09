@@ -3,6 +3,6 @@
   "type": "chore",
   "status": "new",
   "created_at": "2026-07-09T08:56:22Z",
-  "updated_at": "2026-07-09T08:56:22Z",
-  "description": "Expand the archive workflows to include all checked-in source-led DigitalNZ trees"
+  "updated_at": "2026-07-09T10:15:00Z",
+  "description": "Expand the archive workflows to include the DigitalNZ source trees and the RNZ archive bundle"
 }

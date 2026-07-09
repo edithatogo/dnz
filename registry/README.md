@@ -22,7 +22,7 @@ The DigitalNZ source archive now includes workflow-backed metadata paths for pub
 
 | Target | Status | Notes |
 | --- | --- | --- |
-| Hugging Face | Metadata workflow configured | `SOURCE_ARCHIVE_CARD.md` is staged by `.github/workflows/hf_metadata.yml`, which uploads `digitalnz/` and `pydnz/` as the current source archive bundle once `HF_TOKEN` and `HF_REPO_ID` are set. |
+| Hugging Face | Metadata workflow configured | `SOURCE_ARCHIVE_CARD.md` is staged by `.github/workflows/hf_metadata.yml`, which uploads `digitalnz/`, `pydnz/`, and `rnz/` as the current source archive bundle once `HF_TOKEN` and `HF_REPO_ID` are set. |
 | Zenodo | Metadata workflow configured | `SOURCE_ARCHIVE_CARD.md` is staged by `.github/workflows/zenodo_publish.yml`, which uploads the same source bundle; live deposition publication still requires a Zenodo token and manual confirmation. |
 
 ## Recommended Next Artifact

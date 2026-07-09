@@ -5,7 +5,7 @@ description: Metadata-only coverage of the Radio New Zealand collection family r
 
 # RNZ Recordings and Associated Documents
 
-This page records the Radio New Zealand collection family that is already present in the checked-in DigitalNZ exports.
+This page records the Radio New Zealand collection family that is already present in the checked-in DigitalNZ exports and mirrored in the repo-local `rnz/` archive bundle.
 
 All of the RNZ rows in the facet export are tagged `All rights reserved`, so this page treats them as metadata and documentation only.
 
@@ -22,4 +22,4 @@ All of the RNZ rows in the facet export are tagged `All rights reserved`, so thi
 
 - The counts above are snapshot counts from the checked-in facet export, not live API calls.
 - `digitalnz/digitalnz_collections.csv` also records the Radio New Zealand family at the collection level.
-- The archive workflows already mirror the source corpus that produced these rows; this page documents the RNZ family without claiming redistributable media rights.
+- The archive workflows mirror the `rnz/` bundle alongside the other source trees; this page documents the RNZ family without claiming redistributable media rights.

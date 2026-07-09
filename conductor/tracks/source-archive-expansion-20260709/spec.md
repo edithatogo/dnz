@@ -2,18 +2,19 @@
 
 ## Overview
 
-Expand the `dnz` archive surface so all checked-in source submodules that represent DigitalNZ-originated source material are covered by the public mirror workflows, not just the notebook corpus under `digitalnz/`.
+Expand the `dnz` archive surface so all checked-in source submodules and curated archive bundles that represent DigitalNZ-originated source material are covered by the public mirror workflows, not just the notebook corpus under `digitalnz/`.
 
-This track treats the source archive as a bundle of source-led artifacts. The initial scope is the existing `digitalnz/` notebook/data archive and the legacy `pydnz/` Python client source snapshot. Both are separately maintained source trees in this repo and both should be represented in the archive metadata and payloads.
+This track treats the source archive as a bundle of source-led artifacts. The initial scope is the existing `digitalnz/` notebook/data archive, the legacy `pydnz/` Python client source snapshot, and the RNZ recordings-and-documents bundle under `rnz/`. Each is separately maintained in this repo and each should be represented in the archive metadata and payloads.
 
 ## Functional Requirements
 
 - Identify every source submodule or source-led tree that belongs in the archive bundle.
   - `digitalnz/` notebook and data corpus.
   - `pydnz/` legacy Python client source.
+  - `rnz/` RNZ recordings and associated documents bundle.
 - Extend the archive payloads.
-  - Hugging Face mirror should include all in-scope source trees.
-  - Zenodo publication should include the same source trees.
+  - Hugging Face mirror should include all in-scope source trees and curated archive bundles.
+  - Zenodo publication should include the same source trees and bundles.
   - A top-level archive README should describe the combined archive and its parts.
 - Keep source artifacts intact.
   - Do not alter the source trees solely for packaging.
@@ -30,7 +31,7 @@ This track treats the source archive as a bundle of source-led artifacts. The in
 
 ## Acceptance Criteria
 
-- The HF and Zenodo archive workflows include both `digitalnz/` and `pydnz/`.
+- The HF and Zenodo archive workflows include `digitalnz/`, `pydnz/`, and `rnz/`.
 - A top-level archive README explains the combined source bundle.
 - Archive documentation states the current scope explicitly.
 - The workflow changes do not mutate source trees or include Git metadata.

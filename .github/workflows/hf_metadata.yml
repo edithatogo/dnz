@@ -46,6 +46,7 @@ jobs:
               shutil.rmtree(publish_root)
           shutil.copytree("digitalnz", publish_root / "digitalnz", ignore=shutil.ignore_patterns(".git", ".gitmodules"))
           shutil.copytree("pydnz", publish_root / "pydnz", ignore=shutil.ignore_patterns(".git", ".gitmodules"))
+          shutil.copytree("rnz", publish_root / "rnz", ignore=shutil.ignore_patterns(".git", ".gitmodules"))
           (publish_root / "README.md").write_text(card.read_text(encoding="utf-8"), encoding="utf-8")
 
           HfApi().upload_folder(

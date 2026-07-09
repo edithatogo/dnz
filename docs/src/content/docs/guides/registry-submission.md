@@ -6,7 +6,7 @@ title: Registry Submission
 
 `dnz` currently distributes release binaries through GitHub Releases. Live submissions to package and MCP registries are tracked separately from dry-run packaging checks.
 
-The source archive workflows also mirror the checked-in `digitalnz/` notebook corpus and the legacy `pydnz/` Python client source tree into Hugging Face and Zenodo source snapshots.
+The source archive workflows also mirror the checked-in `digitalnz/` notebook corpus, the legacy `pydnz/` Python client source tree, and the `rnz/` archive bundle into Hugging Face and Zenodo source snapshots.
 
 ## Published
 

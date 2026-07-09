@@ -22,6 +22,9 @@ This page maps the repository's API-related documentation sources into the publi
 | `digitalnz/facets/*.csv` | Generated collection and facet inventories | Retained source artifacts | Used to derive the published major collections page. |
 | `digitalnz/open_collections_digitalnz.html` | Visual collection inventory artifact | Retained source artifact | Provides a visual companion to the collection counts. |
 | `digitalnz/facets/usage_by_collection_and_partner.csv` | Collection-family rights metadata | Retained source artifact | Used to document the RNZ family as metadata-only coverage. |
+| `rnz/README.md` | RNZ archive bundle overview | Retained source artifact | Describes the curated RNZ archive bundle mirrored to public archives. |
+| `rnz/*.csv` | RNZ collection and rights snapshot | Retained source artifacts | Capture the recording and document records derived from the facet exports. |
+| `rnz/recordings.md` | RNZ recording inventory | Retained source artifact | Summarizes the RNZ recording and associated-document rows. |
 | `docs/src/content/docs/generated/rnz-recordings-and-docs.md` | RNZ family documentation page | Published as-is | Records the Radio New Zealand collection rows without asserting media redistribution rights. |
 | `crates/dnz-core/src/*` | Core library implementation docs | Explained through architecture and code comments | Surface the client, models, export, vector, and digest layers. |
 | `crates/dnz-cli/src/*` | CLI implementation docs | Explained through the quickstart and CLI help | Maps the user-facing CLI surface to published docs. |
@@ -33,4 +36,4 @@ This page maps the repository's API-related documentation sources into the publi
 - Start with the docs index and quickstart for end-user guidance.
 - Use the architecture and contract pages for boundary and integration detail.
 - Treat notebooks and CSVs under `digitalnz/` and the legacy source tree under `pydnz/` as historical source artifacts that back the published inventory pages and source archive snapshots.
-- Use the RNZ family page as metadata-only documentation for the checked-in Radio New Zealand rows.
+- Use the RNZ archive bundle and family page together as documentation for the checked-in Radio New Zealand rows.
