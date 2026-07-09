@@ -21,6 +21,7 @@ Existing Astro docs app under docs/ plus Rust, MCP, and Python FFI references.
 
 - [API Documentation Map](./generated/api-documentation-map.md)
 - [Major DigitalNZ Collections](./generated/digitalnz-major-collections.md)
+- [RNZ Recordings and Associated Documents](./generated/rnz-recordings-and-docs.md)
 
 ## Policy
 

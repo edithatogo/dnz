@@ -18,6 +18,7 @@ This archive packages the checked-in DigitalNZ source trees for long-term citati
 - Notebook-led DigitalNZ source material and generated facet inventories.
 - Legacy Python client source files and package metadata.
 - Source README and license files from each included tree.
+- Collection metadata and rights exports that document the Radio New Zealand family as metadata-only coverage.
 
 ## Notes
 
