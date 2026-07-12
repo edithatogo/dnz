@@ -77,7 +77,7 @@
 
 ---
 ---
-## [ ] Track 20: DigitalNZ Handoff Notification
+## [x] Track 20: DigitalNZ Handoff Notification
 - Folder: [digitalnz-handoff-notification-20260707](./tracks/digitalnz-handoff-notification-20260707)
 
 ---
