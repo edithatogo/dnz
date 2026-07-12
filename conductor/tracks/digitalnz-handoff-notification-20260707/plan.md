@@ -22,7 +22,7 @@
 
 ## Phase 3: Record Outcome
 
-- [x] Task: Document the result.
+- [x] Task: Document the result (`e72df74`).
   - [x] Record the successful issue update and its public URL.
   - [x] Link the notification from the track.
   - [x] Update the track metadata when done.
