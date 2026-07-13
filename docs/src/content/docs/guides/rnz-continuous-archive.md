@@ -34,6 +34,8 @@ Each item records source and normalized audio, transcript JSON, anonymous speake
 
 The analysis fields are search and review aids. They are not editorial classifications, definitive language identification, speaker identification, or evidence about a person's identity. Canonical transcript text remains separately preserved and is never overwritten by enrichment.
 
+Compound RNZ landing pages are expanded into a DigitalNZ parent and stable `digitalnz--rnz-media` child records. One child is processed within the current bound and the remaining children stay queued. Before packaging, the pipeline verifies every required derivative is non-empty, normalized duration matches the source, speaker labels remain anonymous, and the normalized-audio checksum can identify exact duplicates. Sensitive-content matches only create review signals; they never restrict or remove an item automatically.
+
 ## Follow-on enrichment
 
 Conductor tracks 23 through 26 govern acoustic event and music segmentation, Māori and multilingual evaluation, entity-linked search, compound-page extraction, perceptual deduplication, post-publication integrity audits, and sensitive-content review. These functions require measured evaluation before they can run automatically on production recordings.

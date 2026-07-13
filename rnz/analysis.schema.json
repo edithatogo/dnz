@@ -14,6 +14,7 @@
     "chapters",
     "quality_flags",
     "maori_marker_count",
+    "sensitive_review_signals",
     "limitations"
   ],
   "properties": {
@@ -51,6 +52,7 @@
     },
     "quality_flags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
     "maori_marker_count": {"type": "integer", "minimum": 0},
+    "sensitive_review_signals": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
     "limitations": {"type": "array", "items": {"type": "string"}, "minItems": 1}
   },
   "additionalProperties": false

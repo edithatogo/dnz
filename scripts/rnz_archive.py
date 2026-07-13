@@ -50,6 +50,12 @@ SECTION_TERMS = {
     "interview": ("joining us", "my guest", "welcome to the programme"),
     "credits": ("produced by", "executive producer", "you have been listening"),
 }
+SENSITIVE_REVIEW_TERMS = {
+    "children_or_minors": (" child ", " children ", " minor ", " school student "),
+    "callers_or_public_contributors": (" caller ", " call us ", " text us ", " talkback "),
+    "victims_or_survivors": (" victim ", " survivor ", " bereaved "),
+    "distressing_subject_matter": (" suicide ", " sexual assault ", " family violence ", " graphic content "),
+}
 
 
 def utc_now() -> str:
@@ -58,6 +64,18 @@ def utc_now() -> str:
 
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def child_record_id(parent_record_id: str, media_id: str) -> str:
+    return f"{parent_record_id}--rnz-{media_id}"
 
 
 def canonical_host(url: str) -> str:
@@ -140,6 +158,25 @@ class MediaHTMLParser(html.parser.HTMLParser):
                 self.urls.append(str(values["content"]))
 
 
+class EmbeddedRNZMediaParser(html.parser.HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.items: list[dict[str, Any]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "rnz-queue-media":
+            return
+        media = dict(attrs).get("media")
+        if not media:
+            return
+        try:
+            item = json.loads(html.unescape(media))
+        except json.JSONDecodeError:
+            return
+        if item.get("id") and item.get("audioSrc") and item.get("canDownload", True):
+            self.items.append(item)
+
+
 def media_candidates(record: dict[str, Any]) -> list[str]:
     candidates: list[str] = []
     preferred_keys = ("object_url", "source_url", "landing_url", "url")
@@ -164,6 +201,23 @@ def extract_matching_audio_url(source_url: str, body: str) -> str | None:
         re.DOTALL,
     )
     return media.group(1).replace("\\/", "/") if media else None
+
+
+def embedded_rnz_media(body: str, policy: dict[str, Any]) -> list[dict[str, str]]:
+    parser = EmbeddedRNZMediaParser()
+    parser.feed(body)
+    results = []
+    seen = set()
+    for item in parser.items:
+        media_url = str(item["audioSrc"])
+        media_id = str(item["id"])
+        if media_id in seen or not host_allowed(media_url, policy["allowed_media_domains"]):
+            continue
+        seen.add(media_id)
+        results.append(
+            {"media_id": media_id, "media_url": media_url, "title": str(item.get("title") or media_id)}
+        )
+    return results
 
 
 def fetch_json(
@@ -264,11 +318,11 @@ def discover(args: argparse.Namespace) -> int:
     return 0
 
 
-def resolve_media_url(source_url: str, policy: dict[str, Any]) -> str:
+def resolve_media_assets(source_url: str, policy: dict[str, Any]) -> list[dict[str, str]]:
     if not host_allowed(source_url, policy["allowed_media_domains"]):
         raise ValueError("source host is not allowlisted")
     if urllib.parse.urlparse(source_url).path.lower().endswith(MEDIA_EXTENSIONS):
-        return source_url
+        return [{"media_id": "direct", "media_url": source_url, "title": "Direct media"}]
     request = urllib.request.Request(source_url, headers={"User-Agent": "dnz-rnz-archive/1"})
     with urllib.request.urlopen(request, timeout=60) as response:
         final_url = response.geturl()
@@ -276,12 +330,16 @@ def resolve_media_url(source_url: str, policy: dict[str, Any]) -> str:
             raise ValueError("landing-page redirect left the allowlist")
         content_type = response.headers.get_content_type()
         if content_type in policy["allowed_content_types"]:
-            return final_url
+            return [{"media_id": "direct", "media_url": final_url, "title": "Direct media"}]
         body = response.read(5_000_000).decode("utf-8", errors="ignore")
     matching = extract_matching_audio_url(source_url, body)
     if matching and host_allowed(matching, policy["allowed_media_domains"]):
-        return matching
+        media_id = re.search(r"/audio/(\d+)(?:/|$)", urllib.parse.urlparse(source_url).path)
+        return [{"media_id": media_id.group(1) if media_id else "direct", "media_url": matching, "title": "Matched RNZ media"}]
     if re.search(r"/audio/\d+(?:/|$)", urllib.parse.urlparse(source_url).path):
+        embedded = embedded_rnz_media(body, policy)
+        if embedded:
+            return embedded
         raise ValueError("landing page does not contain media for the requested audio ID")
     parser = MediaHTMLParser()
     parser.feed(body)
@@ -290,8 +348,15 @@ def resolve_media_url(source_url: str, policy: dict[str, Any]) -> str:
         if candidate.lower().split("?", 1)[0].endswith(MEDIA_EXTENSIONS) and host_allowed(
             candidate, policy["allowed_media_domains"]
         ):
-            return candidate
+            return [{"media_id": "embedded", "media_url": candidate, "title": "Embedded media"}]
     raise ValueError("no allowlisted media URL found")
+
+
+def resolve_media_url(source_url: str, policy: dict[str, Any]) -> str:
+    assets = resolve_media_assets(source_url, policy)
+    if len(assets) != 1:
+        raise ValueError(f"landing page contains {len(assets)} child recordings")
+    return assets[0]["media_url"]
 
 
 def download_media(url: str, destination: Path, policy: dict[str, Any]) -> tuple[str, int, str]:
@@ -410,6 +475,10 @@ def transcript_analysis(
         for kind, terms in SECTION_TERMS.items()
         if any(term in str(segment["text"]).lower() for term in terms)
     ]
+    padded_text = f" {full_text} "
+    sensitive_review_signals = [
+        signal for signal, terms in SENSITIVE_REVIEW_TERMS.items() if any(term in padded_text for term in terms)
+    ]
     chapters = []
     for index, segment in enumerate(spoken):
         if index == 0 or float(segment["start"]) - float(spoken[index - 1]["end"]) >= 5.0:
@@ -444,11 +513,42 @@ def transcript_analysis(
         "chapters": chapters,
         "quality_flags": list(dict.fromkeys(quality_flags)),
         "maori_marker_count": len(maori_markers),
+        "sensitive_review_signals": sensitive_review_signals,
         "limitations": [
             "Topic and section tags are deterministic search hints, not editorial classifications.",
             "Māori markers trigger review and do not constitute language identification.",
             "Speaker labels are anonymous and must not be used for speaker identification.",
+            "Sensitive-content signals only request review and must not trigger automatic restriction or removal.",
         ],
+    }
+
+
+def verify_item_outputs(output_dir: Path, expected_duration: float) -> dict[str, Any]:
+    required = (
+        "audio.flac", "transcript.json", "transcript.srt", "transcript.vtt",
+        "transcript.txt", "diarization.rttm", "analysis.json", "chapters.json",
+    )
+    missing = [name for name in required if not (output_dir / name).is_file() or (output_dir / name).stat().st_size == 0]
+    if missing:
+        raise RuntimeError(f"item output verification failed; missing or empty: {', '.join(missing)}")
+    normalized_duration = ffprobe_duration(output_dir / "audio.flac")
+    if abs(normalized_duration - expected_duration) > 1.0:
+        raise RuntimeError("normalized audio duration differs from the source by more than one second")
+    transcript = load_json(output_dir / "transcript.json")
+    if not isinstance(transcript.get("segments"), list):
+        raise RuntimeError("canonical transcript has no segment list")
+    invalid_speakers = {
+        str(segment.get("speaker"))
+        for segment in transcript["segments"]
+        if segment.get("speaker") and not re.fullmatch(r"SPEAKER_\d+|SPEAKER_UNKNOWN", str(segment["speaker"]))
+    }
+    if invalid_speakers:
+        raise RuntimeError("canonical transcript contains non-anonymous speaker labels")
+    return {
+        "verified": True,
+        "normalized_duration_seconds": normalized_duration,
+        "normalized_sha256": sha256_file(output_dir / "audio.flac"),
+        "verified_outputs": list(required),
     }
 
 
@@ -521,7 +621,43 @@ def process(args: argparse.Namespace) -> int:
         source_path = output_dir / "source.media"
         normalized = output_dir / "audio.flac"
         try:
-            media_url = resolve_media_url(item["source_url"], policy)
+            assets = resolve_media_assets(item["source_url"], policy)
+            if len(assets) > 1:
+                parent_record_id = record_id
+                append_event(
+                    args.manifest,
+                    {
+                        **item,
+                        "event": "expanded",
+                        "child_count": len(assets),
+                        "child_record_ids": [child_record_id(parent_record_id, asset["media_id"]) for asset in assets],
+                    },
+                )
+                children = []
+                for asset in assets:
+                    child = append_event(
+                        args.manifest,
+                        {
+                            **item,
+                            "record_id": child_record_id(parent_record_id, asset["media_id"]),
+                            "parent_record_id": parent_record_id,
+                            "rnz_media_id": asset["media_id"],
+                            "source_url": asset["media_url"],
+                            "title": asset["title"],
+                            "event": "discovered",
+                            "retry_count": 0,
+                        },
+                    )
+                    children.append((child, asset))
+                item, asset = children[0]
+                record_id = str(item["record_id"])
+                output_dir = args.output / datetime.now(timezone.utc).strftime("%Y-%m") / "items" / record_id
+                output_dir.mkdir(parents=True, exist_ok=True)
+                source_path = output_dir / "source.media"
+                normalized = output_dir / "audio.flac"
+                media_url = asset["media_url"]
+            else:
+                media_url = assets[0]["media_url"]
             sha256, size, content_type = download_media(media_url, source_path, policy)
             duration = ffprobe_duration(source_path)
             if duration > float(policy["max_duration_seconds"]):
@@ -529,9 +665,20 @@ def process(args: argparse.Namespace) -> int:
             normalize_audio(source_path, normalized)
             append_event(args.manifest, {**item, "event": "downloaded", "media_url": media_url, "sha256": sha256, "size_bytes": size, "content_type": content_type, "duration_seconds": duration})
             result = transcribe(normalized, output_dir, policy, hf_token, duration)
-            provenance = {"record_id": record_id, "source_url": item["source_url"], "media_url": media_url, "sha256": sha256, "rights_basis": policy["rights_basis"], "models": policy["models"], "generated_at": utc_now()}
+            integrity = verify_item_outputs(output_dir, duration)
+            duplicate_of = next(
+                (
+                    event["record_id"]
+                    for event in read_events(args.manifest)
+                    if event.get("event") == "processed"
+                    and event.get("normalized_sha256") == integrity["normalized_sha256"]
+                    and event.get("record_id") != record_id
+                ),
+                None,
+            )
+            provenance = {"record_id": record_id, "parent_record_id": item.get("parent_record_id"), "source_url": item["source_url"], "media_url": media_url, "sha256": sha256, "rights_basis": policy["rights_basis"], "models": policy["models"], "integrity": integrity, "duplicate_of": duplicate_of, "generated_at": utc_now()}
             (output_dir / "provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
-            append_event(args.manifest, {**item, "event": "processed", "media_url": media_url, "sha256": sha256, "size_bytes": size, "duration_seconds": duration, "models": policy["models"], "outputs": result["outputs"], "quality_flags": result["quality_flags"]})
+            append_event(args.manifest, {**item, "event": "processed", "media_url": media_url, "sha256": sha256, "normalized_sha256": integrity["normalized_sha256"], "duplicate_of": duplicate_of, "size_bytes": size, "duration_seconds": duration, "models": policy["models"], "outputs": result["outputs"], "quality_flags": result["quality_flags"]})
         except Exception as exc:
             source_path.unlink(missing_ok=True)
             count = int(item.get("retry_count", 0)) + 1

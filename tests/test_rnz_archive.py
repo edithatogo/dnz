@@ -103,6 +103,23 @@ class RNZArchiveTests(unittest.TestCase):
             )
         )
 
+    def test_compound_page_extracts_only_downloadable_rnz_children(self):
+        body = """
+        <rnz-queue-media media='{"id":201,"title":"First","audioSrc":"https://podcast.radionz.co.nz/a.mp3","canDownload":true}'></rnz-queue-media>
+        <rnz-queue-media media='{"id":202,"title":"Blocked","audioSrc":"https://podcast.radionz.co.nz/b.mp3","canDownload":false}'></rnz-queue-media>
+        <rnz-queue-media media='{"id":203,"title":"External","audioSrc":"https://example.org/c.mp3","canDownload":true}'></rnz-queue-media>
+        """
+        policy = {"allowed_media_domains": ["radionz.co.nz"]}
+        self.assertEqual(
+            [{"media_id": "201", "media_url": "https://podcast.radionz.co.nz/a.mp3", "title": "First"}],
+            rnz_archive.embedded_rnz_media(body, policy),
+        )
+
+    def test_child_record_ids_are_stable_and_windows_safe(self):
+        child = rnz_archive.child_record_id("41680624", "2018696729")
+        self.assertEqual("41680624--rnz-2018696729", child)
+        self.assertNotRegex(child, r'[<>:"/\\|?*]')
+
     def test_audio_id_page_rejects_unrelated_fallback_media(self):
         class Response:
             headers = Message()
@@ -190,10 +207,36 @@ class RNZArchiveTests(unittest.TestCase):
         self.assertIn("possible_music_or_non_speech", analysis["quality_flags"])
         self.assertIn("no_speech_segments", analysis["quality_flags"])
 
+    def test_transcript_analysis_emits_review_only_sensitive_signals(self):
+        analysis = rnz_archive.transcript_analysis(
+            [{"start": 0, "end": 2, "text": "A caller discussed family violence", "words": []}],
+            2.0,
+            [],
+        )
+        self.assertIn("callers_or_public_contributors", analysis["sensitive_review_signals"])
+        self.assertIn("distressing_subject_matter", analysis["sensitive_review_signals"])
+        self.assertTrue(any("must not trigger" in item for item in analysis["limitations"]))
+
     def test_analysis_schema_requires_every_generated_field(self):
         schema = json.loads((ROOT / "rnz" / "analysis.schema.json").read_text(encoding="utf-8"))
         analysis = rnz_archive.transcript_analysis([], 60.0, [])
         self.assertEqual(set(schema["required"]), set(analysis))
+
+    def test_item_integrity_rejects_non_anonymous_speaker_labels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            required = (
+                "audio.flac", "transcript.srt", "transcript.vtt", "transcript.txt",
+                "diarization.rttm", "analysis.json", "chapters.json",
+            )
+            for name in required:
+                (output / name).write_text("content", encoding="utf-8")
+            (output / "transcript.json").write_text(
+                json.dumps({"segments": [{"speaker": "KNOWN_PERSON"}]}), encoding="utf-8"
+            )
+            with mock.patch.object(rnz_archive, "ffprobe_duration", return_value=10.0):
+                with self.assertRaisesRegex(RuntimeError, "non-anonymous"):
+                    rnz_archive.verify_item_outputs(output, 10.0)
 
     def test_zero_cost_policy_rejects_paid_services(self):
         with tempfile.TemporaryDirectory() as directory:
