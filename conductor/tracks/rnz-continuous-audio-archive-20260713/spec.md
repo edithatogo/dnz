@@ -8,7 +8,7 @@ Build a resumable GitHub Actions pipeline that discovers rights-cleared RNZ reco
 
 - Run daily and by manual dispatch on standard `ubuntu-latest` runners only.
 - Fail closed when the repository is private, zero-cost policy fails, required rights evidence is absent, or free archive capacity is unavailable.
-- Maintain an append-only item manifest with provenance, checksums, state transitions, retries, models, and archive locations.
+- Maintain an append-only item manifest with minimal provenance, checksums, state transitions, retries, models, and archive locations; refresh DigitalNZ-derived metadata within its permitted cache window.
 - Allow only HTTPS media from configured RNZ domains, with redirect, size, duration, type, and checksum validation.
 - Transcribe with pinned faster-whisper models, align supported languages with WhisperX, and diarize anonymously with pinned pyannote Community-1.
 - Publish WebDataset audio shards, Parquet metadata/transcripts, captions, RTTM, checksums, and provenance to a public Hugging Face dataset.

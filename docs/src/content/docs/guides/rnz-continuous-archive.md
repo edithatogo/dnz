@@ -16,13 +16,17 @@ The RNZ archive pipeline uses standard Linux GitHub-hosted runners in this publi
 
 ## Secrets and variables
 
-Required secrets are `DIGITALNZ_API_KEY`, `HF_TOKEN`, and `ZENODO_TOKEN`. The Hugging Face token must be fine-grained to the public dataset and must have accepted access to `pyannote/speaker-diarization-community-1`.
+Required secrets are `HF_TOKEN` and `ZENODO_TOKEN`. DigitalNZ public content is discovered without a key; an optional `DIGITALNZ_API_KEY` can be supplied only for an approved higher-throughput allocation. The Hugging Face token must be fine-grained to the public dataset and must have accepted access to `pyannote/speaker-diarization-community-1`.
 
 Required repository variables are `HF_REPO_ID=edithatogo/digitalnz`, `GH_ZERO_COST_REVIEWED_AT=YYYY-MM-DD`, and `HF_ZERO_COST_REVIEWED_AT=YYYY-MM-DD`. Reviews expire after 90 days. Only after account review and the pilot checkpoint should `RNZ_ARCHIVE_ENABLED=true` be set.
 
 For a personal GitHub repository, the current budget REST API cannot create an Actions budget at personal-account scope. Confirm the account-level Actions spending limit in GitHub billing, keep this repository public, and record the review date. The workflow still rejects every paid runner label regardless of the account setting.
 
 Hugging Face billing review must confirm there are no RNZ-related Jobs, endpoints, paid Spaces hardware, storage add-ons, or organization billing. Publication uses only the fixed public dataset and stops on free-capacity failure.
+
+The local `hf` CLI is installed for account inspection but intentionally remains signed out unless an operator authenticates it with a fine-grained dataset token. GitHub Actions uses the existing repository secret without exposing it locally.
+
+Production must remain disabled until the `edithatogo` account accepts the contact-sharing conditions for `pyannote/speaker-diarization-community-1` and the Actions token is proven to read the gated model.
 
 ## Outputs
 

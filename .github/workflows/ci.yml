@@ -53,6 +53,12 @@ jobs:
       - name: Validate Conductor Learning Log
         run: python3 scripts/validate_learning_log.py
 
+      - name: Validate zero-cost RNZ archive policy
+        run: python3 scripts/rnz_archive.py policy
+
+      - name: Run offline RNZ archive tests
+        run: python3 -m unittest tests.test_rnz_archive
+
       - name: Install Cargo LLVM Cov
         uses: taiki-e/install-action@v2
         with:

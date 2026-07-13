@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import html.parser
 import json
 import os
@@ -136,9 +137,29 @@ def media_candidates(record: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(candidates))
 
 
-def fetch_json(url: str, params: dict[str, Any], timeout: int = 60) -> dict[str, Any]:
+def extract_matching_audio_url(source_url: str, body: str) -> str | None:
+    match = re.search(r"/audio/(\d+)(?:/|$)", urllib.parse.urlparse(source_url).path)
+    if not match:
+        return None
+    audio_id = re.escape(match.group(1))
+    decoded = html.unescape(body)
+    media = re.search(
+        rf'["\\]id["\\]?\s*:\s*{audio_id}.*?["\\]audioSrc["\\]?\s*:\s*["\\](https:[^"\\]+)',
+        decoded,
+        re.DOTALL,
+    )
+    return media.group(1).replace("\\/", "/") if media else None
+
+
+def fetch_json(
+    url: str,
+    params: dict[str, Any],
+    timeout: int = 60,
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
     encoded = urllib.parse.urlencode(params, doseq=True)
-    request = urllib.request.Request(f"{url}?{encoded}", headers={"User-Agent": "dnz-rnz-archive/1"})
+    request_headers = {"User-Agent": "dnz-rnz-archive/1", **(headers or {})}
+    request = urllib.request.Request(f"{url}?{encoded}", headers=request_headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.load(response)
 
@@ -148,23 +169,24 @@ def discover(args: argparse.Namespace) -> int:
     if not policy.get("rights_authorized"):
         raise RuntimeError("rights_authorized must be true before discovery")
     api_key = args.api_key or os.environ.get("DIGITALNZ_API_KEY")
-    if not api_key:
-        raise RuntimeError("DIGITALNZ_API_KEY is required")
     existing = latest_by_record(read_events(args.manifest))
     remaining = args.limit
     collections = policy["collections"]
     for collection in collections:
         if remaining <= 0:
             break
+        params: dict[str, Any] = {
+            "text": args.query or "*",
+            "and[primary_collection][]": collection,
+            "and[category][]": "Audio",
+            "per_page": min(100, remaining),
+            "page": 1,
+        }
+        headers = {"Authentication-Token": api_key} if api_key else None
         payload = fetch_json(
             "https://api.digitalnz.org/v3/records.json",
-            {
-                "api_key": api_key,
-                "text": args.query or "*",
-                "and[primary_collection][]": collection,
-                "per_page": min(100, remaining),
-                "page": 1,
-            },
+            params,
+            headers=headers,
         )
         records = payload.get("search", {}).get("results", [])
         for record in records:
@@ -207,6 +229,9 @@ def resolve_media_url(source_url: str, policy: dict[str, Any]) -> str:
         if content_type in policy["allowed_content_types"]:
             return final_url
         body = response.read(5_000_000).decode("utf-8", errors="ignore")
+    matching = extract_matching_audio_url(source_url, body)
+    if matching and host_allowed(matching, policy["allowed_media_domains"]):
+        return matching
     parser = MediaHTMLParser()
     parser.feed(body)
     for candidate in parser.urls:
@@ -368,9 +393,10 @@ def package(args: argparse.Namespace) -> int:
     events = read_events(args.manifest)
     processed = [event for event in events if event.get("event") == "processed"]
     args.output.mkdir(parents=True, exist_ok=True)
-    pq.write_table(pa.Table.from_pylist(processed), args.output / "manifest.parquet")
-    (args.output / "manifest.jsonl").write_text("".join(json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n" for event in events), encoding="utf-8")
-    shard = args.output / "audio-00000.tar"
+    shard_id = re.sub(r"[^A-Za-z0-9_.-]", "-", args.shard_id)
+    pq.write_table(pa.Table.from_pylist(processed), args.output / f"manifest-{shard_id}.parquet")
+    (args.output / f"manifest-{shard_id}.jsonl").write_text("".join(json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n" for event in events), encoding="utf-8")
+    shard = args.output / f"audio-{shard_id}.tar"
     with tarfile.open(shard, "w") as archive:
         for path in sorted(args.items.rglob("*")):
             if path.is_file():
@@ -379,7 +405,7 @@ def package(args: argparse.Namespace) -> int:
     for path in sorted(args.output.iterdir()):
         if path.is_file():
             checksums.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}")
-    (args.output / "SHA256SUMS").write_text("\n".join(checksums) + "\n", encoding="utf-8")
+    (args.output / f"SHA256SUMS-{shard_id}").write_text("\n".join(checksums) + "\n", encoding="utf-8")
     return 0
 
 
@@ -428,6 +454,7 @@ def main(argv: list[str] | None = None) -> int:
     package_parser.add_argument("--manifest", type=Path, required=True)
     package_parser.add_argument("--items", type=Path, required=True)
     package_parser.add_argument("--output", type=Path, required=True)
+    package_parser.add_argument("--shard-id", required=True)
     package_parser.set_defaults(func=package)
 
     summary_parser = subparsers.add_parser("summary")

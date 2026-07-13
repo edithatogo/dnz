@@ -50,7 +50,7 @@ jobs:
           python scripts/rnz_archive.py policy
 
       - name: Install archive clients only
-        run: python -m pip install "huggingface-hub==1.4.1" "requests==2.32.5"
+        run: python -m pip install "click==8.4.2" "huggingface-hub==1.4.1" "requests==2.32.5"
 
       - name: Download changed monthly shard
         env:
@@ -71,7 +71,7 @@ jobs:
           echo "ALREADY_PUBLISHED=false" >> "$GITHUB_ENV"
           hf download "$HF_REPO_ID" --repo-type dataset \
             --include "rnz/releases/$month/*" --local-dir work/hf
-          test -s "work/hf/rnz/releases/$month/SHA256SUMS"
+          compgen -G "work/hf/rnz/releases/$month/SHA256SUMS-*" > /dev/null
 
       - name: Publish changed-content-only Zenodo version
         if: env.ALREADY_PUBLISHED != 'true'

@@ -107,7 +107,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends ffmpeg
-          python -m pip install --requirement rnz/transcription-requirements.txt
+          python -m pip install --require-hashes --requirement rnz/transcription-requirements.lock
 
       - name: Restore append-only state from public Hugging Face dataset
         env:
@@ -132,7 +132,7 @@ jobs:
 
       - name: Discover bounded RNZ batch
         env:
-          DIGITALNZ_API_KEY: ${{ secrets.DIGITALNZ_API_KEY }}
+          DIGITALNZ_API_KEY: ${{ secrets.DIGITALNZ_API_KEY || '' }}
           DISCOVER_LIMIT: ${{ inputs.discover_limit || '100' }}
           RECORD_QUERY: ${{ inputs.record_query || '' }}
         run: |
@@ -161,7 +161,8 @@ jobs:
           python scripts/rnz_archive.py package \
             --manifest work/state/manifest.jsonl \
             --items work/items \
-            --output "work/release/$month"
+            --output "work/release/$month" \
+            --shard-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           mkdir -p work/publish/rnz/state work/publish/rnz/releases
           cp work/state/manifest.jsonl work/publish/rnz/state/manifest.jsonl
           cp -R "work/release/$month" "work/publish/rnz/releases/$month"

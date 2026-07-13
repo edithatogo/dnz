@@ -15,7 +15,9 @@
     "www.rnz.co.nz",
     "media.rnz.co.nz",
     "audio.rnz.co.nz",
-    "podcast.radionz.co.nz"
+    "podcast.radionz.co.nz",
+    "radionz.co.nz",
+    "www.radionz.co.nz"
   ],
   "allowed_content_types": [
     "audio/mpeg",

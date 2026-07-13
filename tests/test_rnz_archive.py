@@ -41,6 +41,22 @@ class RNZArchiveTests(unittest.TestCase):
             rnz_archive.media_candidates(record),
         )
 
+    def test_audio_extraction_requires_matching_rnz_id(self):
+        body = """
+        latest-bulletin='{"id":999,"audioSrc":"https://podcast.radionz.co.nz/news/latest.mp3"}'
+        media='{"id":2018696673,"audioSrc":"https://podcast.radionz.co.nz/tagata/item.mp3"}'
+        """
+        source = "https://www.rnz.co.nz/programme/audio/2018696673/example"
+        self.assertEqual(
+            "https://podcast.radionz.co.nz/tagata/item.mp3",
+            rnz_archive.extract_matching_audio_url(source, body),
+        )
+        self.assertIsNone(
+            rnz_archive.extract_matching_audio_url(
+                "https://www.rnz.co.nz/programme/audio/1234/example", body
+            )
+        )
+
     def test_caption_outputs_use_anonymous_speakers(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
@@ -65,6 +81,15 @@ class RNZArchiveTests(unittest.TestCase):
     def test_repo_workflows_pass_zero_cost_policy(self):
         policy = json.loads((ROOT / "rnz" / "archive-policy.json").read_text(encoding="utf-8"))
         self.assertEqual([], rnz_archive.validate_zero_cost(ROOT / ".github" / "workflows", policy["hf_repo_id"]))
+
+    def test_shard_id_is_required(self):
+        with self.assertRaises(SystemExit):
+            rnz_archive.main([
+                "package",
+                "--manifest", "state.jsonl",
+                "--items", "items",
+                "--output", "release",
+            ])
 
 
 if __name__ == "__main__":
