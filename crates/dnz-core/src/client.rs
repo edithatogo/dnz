@@ -338,6 +338,29 @@ mod tests {
     }
 
     #[test]
+    fn cache_namespace_differs_between_credentials_without_revealing_them() {
+        let first = Client::new("first-secret").search("kauri");
+        let second = Client::new("second-secret").search("kauri");
+        let params = vec![("text".to_string(), "kauri".to_string())];
+
+        let first_key = first.cache_key(&params);
+        let second_key = second.cache_key(&params);
+        assert_ne!(first_key, second_key);
+        assert!(!first_key.contains("first-secret"));
+        assert!(!second_key.contains("second-secret"));
+    }
+
+    #[test]
+    fn retry_after_is_parsed_and_bounded() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(reqwest::header::RETRY_AFTER, "999".parse().unwrap());
+        assert_eq!(retry_after_delay(&headers), Some(Duration::from_secs(60)));
+
+        headers.insert(reqwest::header::RETRY_AFTER, "0".parse().unwrap());
+        assert_eq!(retry_after_delay(&headers), Some(Duration::ZERO));
+    }
+
+    #[test]
     fn test_query_builder_url_construction() {
         let client = Client::new("test_key");
 

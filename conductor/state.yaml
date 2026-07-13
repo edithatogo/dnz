@@ -4,13 +4,14 @@ repository_head: 904c5ea
 branch: codex/dnz-modernisation
 active_track: T01
 active_slice: header-auth-cache-isolation-and-exact-zero-pagination
-status: in_progress
+status: blocked
 verified_gates:
   - cargo fmt --all -- --check
   - cargo metadata --no-deps --format-version 1
 completed_tracks:
   - T00
-blocked_tracks: []
+blocked_tracks:
+  - T01
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
@@ -19,6 +20,7 @@ latest_handoff: conductor/handoff.md
 notes:
   - Workspace test/clippy/build gates are environment-blocked by the PATH Git POSIX linker; preserve this as an external blocker until an MSVC/Windows SDK toolchain is available.
   - T01 structured errors, Retry-After, timeout, auth-mode isolation, endpoint checks, and redacted transport diagnostics are implemented; focused runtime tests and full gates remain.
+  - T01 regression tests were added for cross-credential cache isolation and secret-safe HTTP errors; the isolated GNU test build has not produced an executable binary because dependency compilation remains resource-blocked.
   - T02 has validated bbox, facet exclusion, facet bounds, and protected extra parameters; nested boolean filters and full contract tests remain.
   - T06 dense harvest truncation is removed; export/vector/Python correctness items remain.
   - The branch advanced concurrently with commits 488cfe1 and ede3f99; both were preserved and not rewritten.

@@ -1,6 +1,6 @@
 //! Core client integration tests using wiremock
 
-use dnz_core::Client;
+use dnz_core::{Client, DnzError};
 use wiremock::matchers::{header, method, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -124,4 +124,32 @@ async fn test_mock_search_fields_and_excludes() {
 
     assert_eq!(response.search.results[0].id, "789");
     assert_eq!(response.search.results[0].title, "Short Item");
+}
+
+#[tokio::test]
+async fn http_errors_are_structured_and_secret_safe() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(
+            ResponseTemplate::new(404)
+                .insert_header("Retry-After", "999")
+                .set_body_string("private-token-should-not-escape"),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let error = Client::new("private-token-should-not-escape")
+        .with_base_url(mock_server.uri())
+        .search("missing")
+        .send()
+        .await
+        .expect_err("404 should be returned as a structured error");
+    let structured = error
+        .downcast_ref::<DnzError>()
+        .expect("error should preserve DnzError");
+    assert_eq!(structured.status(), Some(404));
+    assert_eq!(structured.retry_after(), None);
+    assert!(!error
+        .to_string()
+        .contains("private-token-should-not-escape"));
 }
