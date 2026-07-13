@@ -42,7 +42,7 @@ jobs:
 
           token = os.environ["HF_TOKEN"]
           checks = (
-              ("Systran/faster-whisper-large-v3-turbo", "config.json"),
+              ("mobiuslabsgmbh/faster-whisper-large-v3-turbo", "config.json"),
               ("pyannote/speaker-diarization-community-1", "config.yaml"),
           )
           for repo_id, filename in checks:

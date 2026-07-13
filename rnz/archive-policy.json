@@ -40,8 +40,13 @@
   "zenodo_max_files": 100,
   "models": {
     "transcription_primary": "large-v3-turbo",
+    "transcription_primary_repo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+    "transcription_primary_revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
     "transcription_fallback": "large-v3",
+    "transcription_fallback_repo": "Systran/faster-whisper-large-v3",
+    "transcription_fallback_revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
     "diarization": "pyannote/speaker-diarization-community-1",
+    "diarization_revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
     "whisperx_version": "3.8.6",
     "faster_whisper_version": "1.2.1",
     "pyannote_audio_version": "4.0.7"
