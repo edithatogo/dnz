@@ -71,7 +71,7 @@ impl Autopilot {
                 let handle = tokio::spawn(async move {
                     let mut records = Vec::new();
                     // Estimate page iteration limit
-                    let max_pages = record_count.div_ceil(100).min(10) as u32; // Limit to 1000 per partition (API limit)
+                    let max_pages = record_count.div_ceil(100) as u32;
 
                     info!(year = %yr, expected_records = record_count, pages = max_pages, "Fetching query partition segment");
 

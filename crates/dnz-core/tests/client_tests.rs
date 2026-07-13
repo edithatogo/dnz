@@ -1,7 +1,7 @@
 //! Core client integration tests using wiremock
 
 use dnz_core::Client;
-use wiremock::matchers::{method, query_param};
+use wiremock::matchers::{header, method, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
@@ -26,7 +26,7 @@ async fn test_mock_search_request() {
     });
 
     Mock::given(method("GET"))
-        .and(query_param("api_key", "test_key"))
+        .and(header("Authentication-Token", "test_key"))
         .and(query_param("text", "kauri"))
         .and(query_param("page", "1"))
         .and(query_param("per_page", "20"))
@@ -64,7 +64,7 @@ async fn test_mock_search_facets_and_sorting() {
     });
 
     Mock::given(method("GET"))
-        .and(query_param("api_key", "test_key"))
+        .and(header("Authentication-Token", "test_key"))
         .and(query_param("text", "tui"))
         .and(query_param("facets", "category"))
         .and(query_param("sort", "date"))
@@ -105,7 +105,7 @@ async fn test_mock_search_fields_and_excludes() {
     });
 
     Mock::given(method("GET"))
-        .and(query_param("api_key", "test_key"))
+        .and(header("Authentication-Token", "test_key"))
         .and(query_param("text", "mock"))
         .and(query_param("fields", "id,title"))
         .and(query_param("without[category][]", "Videos"))

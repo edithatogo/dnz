@@ -1,9 +1,12 @@
 //! Client and query builder implementations for the DigitalNZ API.
 
 use crate::cache::PersistentCache;
+use crate::errors::DnzError;
 use crate::models::SearchResponse;
 use reqwest::Client as HttpClient;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -13,6 +16,7 @@ use tracing::{debug, warn};
 #[derive(Debug, Clone)]
 pub struct Client {
     api_key: String,
+    legacy_query_key_auth: bool,
     base_url: String,
     http_client: HttpClient,
     // Thread-safe query cache
@@ -25,8 +29,12 @@ impl Client {
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
             api_key: api_key.into(),
+            legacy_query_key_auth: false,
             base_url: "https://api.digitalnz.org/v3/records.json".to_string(),
-            http_client: HttpClient::new(),
+            http_client: HttpClient::builder()
+                .timeout(Duration::from_secs(30))
+                .build()
+                .expect("default HTTP client configuration is valid"),
             cache: Arc::new(Mutex::new(HashMap::new())),
             persistent_cache: None,
         }
@@ -36,6 +44,40 @@ impl Client {
     pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
         self.base_url = base_url.into();
         self
+    }
+
+    /// Override the default request timeout.
+    pub fn with_timeout(mut self, timeout: Duration) -> anyhow::Result<Self> {
+        self.http_client = HttpClient::builder().timeout(timeout).build()?;
+        Ok(self)
+    }
+
+    /// Enable the legacy `api_key` query parameter authentication mode.
+    ///
+    /// Tokens otherwise use the `Authentication-Token` header and are never
+    /// placed in URLs or request previews.
+    pub fn with_legacy_query_key_auth(mut self) -> Self {
+        self.legacy_query_key_auth = true;
+        self
+    }
+
+    /// Construct an unauthenticated client for DigitalNZ's public endpoints.
+    pub fn unauthenticated() -> Self {
+        Self::new("")
+    }
+
+    fn auth_cache_namespace(&self) -> String {
+        if self.api_key.is_empty() {
+            return "public".to_string();
+        }
+        let mut hasher = DefaultHasher::new();
+        self.api_key.hash(&mut hasher);
+        let mode = if self.legacy_query_key_auth {
+            "legacy-query"
+        } else {
+            "header"
+        };
+        format!("{mode}-{:016x}", hasher.finish())
     }
 
     /// Enable SQLite-backed cache storage for responses across sessions.
@@ -66,7 +108,7 @@ impl Client {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
-    use wiremock::matchers::{method, query_param};
+    use wiremock::matchers::{header, method, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn temp_cache_path(name: &str) -> PathBuf {
@@ -85,10 +127,29 @@ mod tests {
     fn per_page_clamps_to_api_bounds() {
         let client = Client::new("test");
 
-        assert_eq!(client.search("a").per_page(0).per_page, 1);
+        assert_eq!(client.search("a").per_page(0).per_page, 0);
         assert_eq!(client.search("a").per_page(1).per_page, 1);
         assert_eq!(client.search("a").per_page(100).per_page, 100);
         assert_eq!(client.search("a").per_page(1_000).per_page, 100);
+    }
+
+    #[test]
+    fn query_contract_validates_bbox_and_protected_extra_parameters() {
+        let client = Client::unauthenticated();
+        assert!(client
+            .search("a")
+            .try_geo_bbox(40.0, -10.0, -40.0, 10.0)
+            .is_ok());
+        assert!(client
+            .search("a")
+            .try_geo_bbox(100.0, 0.0, 0.0, 0.0)
+            .is_err());
+        assert!(client
+            .search("a")
+            .try_extra_param("api_key", "secret")
+            .is_err());
+        assert!(client.search("a").try_extra_param("format", "json").is_ok());
+        assert!(client.search("a").try_extra_param("fields", "id").is_err());
     }
 
     #[test]
@@ -191,7 +252,7 @@ mod tests {
         let first_result = first_client.search("kauri").send().await.unwrap();
         assert_eq!(first_result.search.results[0].title, "Persisted Record");
 
-        let second_client = Client::new("second-key")
+        let second_client = Client::new("first-key")
             .with_base_url(mock_server.uri())
             .with_cache_path(&cache_path)
             .expect("persistent cache should initialize");
@@ -199,6 +260,50 @@ mod tests {
         assert_eq!(second_result.search.results[0].title, "Persisted Record");
 
         let _ = std::fs::remove_file(cache_path);
+    }
+
+    #[tokio::test]
+    async fn configured_token_uses_header_by_default() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(header("Authentication-Token", "secret-token"))
+            .and(query_param("per_page", "0"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "search": {"result_count": 2, "results": [], "facets": {}}
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let response = Client::new("secret-token")
+            .with_base_url(mock_server.uri())
+            .search("health")
+            .per_page(0)
+            .send()
+            .await
+            .expect("header-authenticated request should succeed");
+        assert_eq!(response.search.result_count, 2);
+    }
+
+    #[tokio::test]
+    async fn legacy_auth_is_explicitly_query_based() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(query_param("api_key", "legacy-secret"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "search": {"result_count": 1, "results": [], "facets": {}}
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Client::new("legacy-secret")
+            .with_base_url(mock_server.uri())
+            .with_legacy_query_key_auth()
+            .search("health")
+            .send()
+            .await
+            .expect("explicit legacy auth should succeed");
     }
 
     #[test]
@@ -294,6 +399,8 @@ mod tests {
         assert!(builder.and_filters.is_empty());
         assert!(builder.or_filters.is_empty());
         assert!(builder.without_filters.is_empty());
+        assert!(!builder.exclude_filters_from_facets);
+        assert!(builder.extra_params.is_empty());
         assert!(builder.use_cache);
     }
 }
@@ -309,6 +416,8 @@ pub struct QueryBuilder {
     facets: Vec<String>,
     facets_page: u32,
     facets_per_page: u32,
+    exclude_filters_from_facets: bool,
+    extra_params: Vec<(String, String)>,
     sort: Option<String>,
     direction: Option<String>,
     geo_bbox: Option<[f64; 4]>,
@@ -329,6 +438,8 @@ impl QueryBuilder {
             facets: Vec::new(),
             facets_page: 1,
             facets_per_page: 10,
+            exclude_filters_from_facets: false,
+            extra_params: Vec::new(),
             sort: None,
             direction: None,
             geo_bbox: None,
@@ -353,7 +464,7 @@ impl QueryBuilder {
 
     /// Set result records count per page.
     pub fn per_page(mut self, per_page: u32) -> Self {
-        self.per_page = per_page.clamp(1, 100);
+        self.per_page = per_page.min(100);
         self
     }
 
@@ -377,8 +488,28 @@ impl QueryBuilder {
 
     /// Set count of facet terms returned.
     pub fn facets_per_page(mut self, facets_per_page: u32) -> Self {
-        self.facets_per_page = facets_per_page;
+        self.facets_per_page = facets_per_page.min(350);
         self
+    }
+
+    /// Exclude active filters from facet calculations.
+    pub fn exclude_filters_from_facets(mut self, enabled: bool) -> Self {
+        self.exclude_filters_from_facets = enabled;
+        self
+    }
+
+    /// Add a safe provider parameter, rejecting request identity and auth keys.
+    pub fn try_extra_param(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<String>,
+    ) -> anyhow::Result<Self> {
+        let key = key.into();
+        if is_protected_extra_param(&key) || key.contains('&') || key.contains('=') {
+            anyhow::bail!("extra parameter is protected or unsafe: {key}");
+        }
+        self.extra_params.push((key, value.into()));
+        Ok(self)
     }
 
     /// Sort by field and direction.
@@ -392,6 +523,20 @@ impl QueryBuilder {
     pub fn geo_bbox(mut self, n: f64, w: f64, s: f64, e: f64) -> Self {
         self.geo_bbox = Some([n, w, s, e]);
         self
+    }
+
+    /// Set and validate a geographic bounding box.
+    pub fn try_geo_bbox(self, n: f64, w: f64, s: f64, e: f64) -> anyhow::Result<Self> {
+        if [n, w, s, e].iter().any(|value| !value.is_finite())
+            || !(-90.0..=90.0).contains(&n)
+            || !(-90.0..=90.0).contains(&s)
+            || !(-180.0..=180.0).contains(&w)
+            || !(-180.0..=180.0).contains(&e)
+            || n < s
+        {
+            anyhow::bail!("invalid geographic bounding box");
+        }
+        Ok(self.geo_bbox(n, w, s, e))
     }
 
     /// Add an AND constraint filter.
@@ -414,12 +559,20 @@ impl QueryBuilder {
 
     /// Execute the query asynchronously and return parsed search results.
     pub async fn send(self) -> anyhow::Result<SearchResponse> {
+        if !self.client.base_url.starts_with("https://")
+            && !is_local_test_url(&self.client.base_url)
+        {
+            return Err(anyhow::anyhow!("DigitalNZ base URL must use HTTPS"));
+        }
         let mut query_params = vec![
-            ("api_key".to_string(), self.client.api_key.clone()),
             ("text".to_string(), self.text.clone()),
             ("page".to_string(), self.page.to_string()),
             ("per_page".to_string(), self.per_page.to_string()),
         ];
+
+        if self.client.legacy_query_key_auth && !self.client.api_key.is_empty() {
+            query_params.push(("api_key".to_string(), self.client.api_key.clone()));
+        }
 
         if !self.fields.is_empty() {
             query_params.push(("fields".to_string(), self.fields.join(",")));
@@ -432,7 +585,15 @@ impl QueryBuilder {
                 "facets_per_page".to_string(),
                 self.facets_per_page.to_string(),
             ));
+            if self.exclude_filters_from_facets {
+                query_params.push((
+                    "exclude_filters_from_facets".to_string(),
+                    "true".to_string(),
+                ));
+            }
         }
+
+        query_params.extend(self.extra_params.iter().cloned());
 
         if let (Some(sort), Some(dir)) = (self.sort.clone(), self.direction.clone()) {
             query_params.push(("sort".to_string(), sort));
@@ -490,7 +651,17 @@ impl QueryBuilder {
             }
         }
 
-        debug!(params = ?query_params, "Executing query with exponential retries");
+        let safe_params: Vec<_> = query_params
+            .iter()
+            .map(|(key, value)| {
+                if key == "api_key" {
+                    (key.as_str(), "[REDACTED]")
+                } else {
+                    (key.as_str(), value.as_str())
+                }
+            })
+            .collect();
+        debug!(params = ?safe_params, "Executing query with exponential retries");
 
         // Retry loop parameters
         let max_retries = 3;
@@ -499,14 +670,11 @@ impl QueryBuilder {
 
         let response = loop {
             attempt += 1;
-            match self
-                .client
-                .http_client
-                .get(&self.client.base_url)
-                .query(&query_params)
-                .send()
-                .await
-            {
+            let mut request = self.client.http_client.get(&self.client.base_url);
+            if !self.client.api_key.is_empty() && !self.client.legacy_query_key_auth {
+                request = request.header("Authentication-Token", &self.client.api_key);
+            }
+            match request.query(&query_params).send().await {
                 Ok(resp) => {
                     let status = resp.status();
                     if status.is_success() {
@@ -514,7 +682,7 @@ impl QueryBuilder {
                             Ok(parsed) => break parsed,
                             Err(e) => {
                                 if attempt >= max_retries {
-                                    return Err(anyhow::anyhow!("JSON Parse Error: {}", e));
+                                    return Err(anyhow::Error::new(DnzError::Decode).context(e));
                                 }
                             }
                         }
@@ -522,24 +690,26 @@ impl QueryBuilder {
                         || status == reqwest::StatusCode::TOO_MANY_REQUESTS)
                         && attempt < max_retries
                     {
+                        let retry_after = retry_after_delay(resp.headers());
                         let jitter = rand::random::<u64>() % 100;
-                        let delay = base_delay * 2_u32.pow(attempt) + Duration::from_millis(jitter);
+                        let delay = retry_after.unwrap_or(base_delay * 2_u32.pow(attempt))
+                            + Duration::from_millis(jitter);
                         warn!(status = ?status, attempt = attempt, delay = ?delay, "Query failed with retriable status code");
                         tokio::time::sleep(delay).await;
                     } else {
-                        return Err(anyhow::anyhow!(
-                            "Query failed with HTTP status code: {}",
-                            status
-                        ));
+                        return Err(anyhow::Error::new(DnzError::HttpStatus {
+                            status: status.as_u16(),
+                            retry_after: retry_after_delay(resp.headers()),
+                        }));
                     }
                 }
-                Err(e) if attempt < max_retries => {
+                Err(_e) if attempt < max_retries => {
                     let jitter = rand::random::<u64>() % 100;
                     let delay = base_delay * 2_u32.pow(attempt) + Duration::from_millis(jitter);
-                    warn!(error = ?e, attempt = attempt, delay = ?delay, "Connection error during query; retrying...");
+                    warn!(attempt = attempt, delay = ?delay, "Connection error during query; retrying...");
                     tokio::time::sleep(delay).await;
                 }
-                Err(e) => return Err(anyhow::anyhow!("HTTP request failed: {}", e)),
+                Err(_e) => return Err(anyhow::Error::new(DnzError::Transport)),
             }
         };
 
@@ -564,6 +734,41 @@ impl QueryBuilder {
             .map(|(key, value)| (key.as_str(), value.as_str()))
             .collect();
         params_without_key.sort_unstable();
-        format!("{:?}_{:?}", self.client.base_url, params_without_key)
+        format!(
+            "{:?}_auth={}_{:?}",
+            self.client.base_url,
+            self.client.auth_cache_namespace(),
+            params_without_key
+        )
     }
+}
+
+fn retry_after_delay(headers: &reqwest::header::HeaderMap) -> Option<Duration> {
+    headers
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map(|seconds| Duration::from_secs(seconds.min(60)))
+}
+
+fn is_local_test_url(value: &str) -> bool {
+    value.starts_with("http://127.0.0.1:") || value.starts_with("http://localhost:")
+}
+
+fn is_protected_extra_param(key: &str) -> bool {
+    matches!(
+        key,
+        "api_key"
+            | "text"
+            | "page"
+            | "per_page"
+            | "fields"
+            | "facets"
+            | "facets_page"
+            | "facets_per_page"
+            | "sort"
+            | "direction"
+            | "geo_bbox"
+            | "exclude_filters_from_facets"
+    )
 }
