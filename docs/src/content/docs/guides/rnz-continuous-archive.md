@@ -39,6 +39,8 @@ Compound RNZ landing pages are expanded into a DigitalNZ parent and stable `digi
 
 Pilot discovery divides its requested record count as evenly as possible across every approved RNZ collection and stores collection and source-year strata. Post-processing review can additionally stratify by measured duration, language signals, speaker count, overlap, confidence and audio-quality flags.
 
+Each state publication refreshes `rnz/state/pilot-report.json` in the public Hugging Face dataset. The report records progress toward the 100-item target and exposes the review strata without requiring operators to parse the append-only event stream.
+
 Repository operators can use the manual `RNZ Archive Review Disposition` workflow to append `approved`, `needs_correction`, `rights_review`, or `no_action` events to `rnz/state/reviews.jsonl`. Each event records the authenticated GitHub actor and run ID. The ledger is append-only and intentionally has no automatic content action; correction, rights, or publication decisions require a separate reviewed change.
 
 ## Follow-on enrichment

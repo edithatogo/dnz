@@ -813,6 +813,15 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
     result["outputs"] = write_caption_files(result["segments"], output_dir)
     result["outputs"].update({"analysis": "analysis.json", "audio_quality": "audio-quality.json", "chapters": "chapters.json", "enrichment": "enrichment.json", "review": "review.json", "rttm": "diarization.rttm"})
     result["review"] = review
+    result["pilot_metrics"] = {
+        "language": language,
+        "speaker_count": analysis["speaker_count"],
+        "overlap_seconds": analysis["overlap_seconds"],
+        "speech_coverage": analysis["speech_coverage"],
+        "average_word_confidence": analysis["average_word_confidence"],
+        "rms_dbfs": audio_quality["rms_dbfs"],
+        "clipped_sample_ratio": audio_quality["clipped_sample_ratio"],
+    }
     return result
 
 
@@ -892,7 +901,7 @@ def process(args: argparse.Namespace) -> int:
             )
             provenance = {"record_id": record_id, "parent_record_id": item.get("parent_record_id"), "source_url": item["source_url"], "media_url": media_url, "sha256": sha256, "rights_basis": policy["rights_basis"], "models": policy["models"], "integrity": integrity, "duplicate_of": duplicate_of, "generated_at": utc_now()}
             (output_dir / "provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
-            append_event(args.manifest, {**item, "event": "processed", "media_url": media_url, "sha256": sha256, "normalized_sha256": integrity["normalized_sha256"], "duplicate_of": duplicate_of, "size_bytes": size, "duration_seconds": duration, "models": policy["models"], "outputs": result["outputs"], "quality_flags": result["quality_flags"], "review_required": result["review"]["required"], "review_reasons": result["review"]["reasons"]})
+            append_event(args.manifest, {**item, "event": "processed", "media_url": media_url, "sha256": sha256, "normalized_sha256": integrity["normalized_sha256"], "duplicate_of": duplicate_of, "size_bytes": size, "duration_seconds": duration, "models": policy["models"], "outputs": result["outputs"], "quality_flags": result["quality_flags"], "pilot_metrics": result["pilot_metrics"], "review_required": result["review"]["required"], "review_reasons": result["review"]["reasons"]})
         except Exception as exc:
             source_path.unlink(missing_ok=True)
             count = int(item.get("retry_count", 0)) + 1
@@ -984,6 +993,43 @@ def record_review(args: argparse.Namespace) -> int:
     return 0
 
 
+def pilot_report(args: argparse.Namespace) -> int:
+    processed = [event for event in latest_by_record(read_events(args.manifest)).values() if event.get("event") == "processed"]
+    rows = []
+    for event in sorted(processed, key=lambda value: str(value["record_id"])):
+        stratum = event.get("pilot_stratum") or {}
+        metrics = event.get("pilot_metrics") or {}
+        rows.append(
+            {
+                "record_id": event["record_id"],
+                "title": event.get("title"),
+                "collection": stratum.get("collection") or event.get("collection"),
+                "year": stratum.get("year"),
+                "duration_seconds": event.get("duration_seconds"),
+                "language": metrics.get("language"),
+                "speaker_count": metrics.get("speaker_count"),
+                "overlap_seconds": metrics.get("overlap_seconds"),
+                "speech_coverage": metrics.get("speech_coverage"),
+                "average_word_confidence": metrics.get("average_word_confidence"),
+                "rms_dbfs": metrics.get("rms_dbfs"),
+                "clipped_sample_ratio": metrics.get("clipped_sample_ratio"),
+                "quality_flags": event.get("quality_flags", []),
+                "review_required": bool(event.get("review_required")),
+            }
+        )
+    payload = {
+        "schema_version": 1,
+        "generated_at": utc_now(),
+        "processed_count": len(rows),
+        "target_count": load_json(args.policy)["pilot_size"],
+        "records": rows,
+    }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps({"processed_count": len(rows), "output": str(args.output)}))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--policy", type=Path, default=Path("rnz/archive-policy.json"))
@@ -1029,6 +1075,11 @@ def main(argv: list[str] | None = None) -> int:
     review_parser.add_argument("--disposition", required=True)
     review_parser.add_argument("--note", default="")
     review_parser.set_defaults(func=record_review)
+
+    pilot_parser = subparsers.add_parser("pilot-report")
+    pilot_parser.add_argument("--manifest", type=Path, required=True)
+    pilot_parser.add_argument("--output", type=Path, required=True)
+    pilot_parser.set_defaults(func=pilot_report)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

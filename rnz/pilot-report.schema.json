@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/edithatogo/dnz/rnz/pilot-report.schema.json",
+  "title": "RNZ pilot review matrix",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "processed_count", "target_count", "records"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "processed_count": {"type": "integer", "minimum": 0},
+    "target_count": {"type": "integer", "minimum": 1},
+    "records": {"type": "array"}
+  },
+  "additionalProperties": false
+}

@@ -313,6 +313,33 @@ class RNZArchiveTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "authenticated GitHub Actions"):
                 rnz_archive.record_review(args)
 
+    def test_pilot_report_exposes_review_strata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "manifest.jsonl"
+            rnz_archive.append_event(
+                manifest,
+                {
+                    "record_id": "123",
+                    "event": "processed",
+                    "rights_basis": "authorized",
+                    "title": "Interview",
+                    "pilot_stratum": {"collection": "Radio New Zealand", "year": 1998},
+                    "duration_seconds": 120,
+                    "pilot_metrics": {"language": "en", "speaker_count": 2, "average_word_confidence": 0.8},
+                    "quality_flags": ["review_me"],
+                    "review_required": True,
+                },
+            )
+            output = root / "pilot.json"
+            args = type("Args", (), {"manifest": manifest, "output": output, "policy": ROOT / "rnz" / "archive-policy.json"})()
+            rnz_archive.pilot_report(args)
+            report = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(1, report["processed_count"])
+            self.assertEqual(100, report["target_count"])
+            self.assertEqual(1998, report["records"][0]["year"])
+            self.assertEqual(2, report["records"][0]["speaker_count"])
+
     def test_analysis_schema_requires_every_generated_field(self):
         schema = json.loads((ROOT / "rnz" / "analysis.schema.json").read_text(encoding="utf-8"))
         analysis = rnz_archive.transcript_analysis([], 60.0, [])

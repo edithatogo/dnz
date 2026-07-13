@@ -41,6 +41,7 @@
     - [x] Receive repository-owner acceptance of the smoke output and submit authenticated `approved` disposition workflow `29250061230` (2026-07-13).
     - [ ] Resubmit the corrected exact-record reprocess proof after the active backfill and approval ledger runs complete; queued run `29249874617` was replaced by GitHub's one-pending concurrency rule.
     - [x] Balance 100-record discovery deterministically across every approved RNZ collection and retain collection/year pilot strata.
+    - [x] Publish a machine-readable pilot review matrix with processed count, collection, year, duration, language, speaker, confidence, overlap and quality fields.
     - [ ] Run and manually review the stratified 100-record pilot.
 - [ ] Task: Review fixes, document residual blockers, and archive the track.
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Verification and Rollout' (Protocol in workflow.md)
