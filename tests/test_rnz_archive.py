@@ -190,6 +190,11 @@ class RNZArchiveTests(unittest.TestCase):
         self.assertIn("possible_music_or_non_speech", analysis["quality_flags"])
         self.assertIn("no_speech_segments", analysis["quality_flags"])
 
+    def test_analysis_schema_requires_every_generated_field(self):
+        schema = json.loads((ROOT / "rnz" / "analysis.schema.json").read_text(encoding="utf-8"))
+        analysis = rnz_archive.transcript_analysis([], 60.0, [])
+        self.assertEqual(set(schema["required"]), set(analysis))
+
     def test_zero_cost_policy_rejects_paid_services(self):
         with tempfile.TemporaryDirectory() as directory:
             workflows = Path(directory)

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/edithatogo/dnz/rnz/analysis.schema.json",
+  "title": "RNZ transcript analysis derivative",
+  "type": "object",
+  "required": [
+    "speech_coverage",
+    "average_word_confidence",
+    "adjacent_repeated_segments",
+    "speaker_count",
+    "overlap_seconds",
+    "topics",
+    "section_hints",
+    "chapters",
+    "quality_flags",
+    "maori_marker_count",
+    "limitations"
+  ],
+  "properties": {
+    "speech_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+    "average_word_confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "adjacent_repeated_segments": {"type": "integer", "minimum": 0},
+    "speaker_count": {"type": "integer", "minimum": 0},
+    "overlap_seconds": {"type": "number", "minimum": 0},
+    "topics": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "section_hints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "start", "text"],
+        "properties": {
+          "type": {"type": "string"},
+          "start": {"type": "number", "minimum": 0},
+          "text": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "chapters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["start", "title", "basis"],
+        "properties": {
+          "start": {"type": "number", "minimum": 0},
+          "title": {"type": "string"},
+          "basis": {"enum": ["recording_start", "speech_after_pause"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "quality_flags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "maori_marker_count": {"type": "integer", "minimum": 0},
+    "limitations": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+  },
+  "additionalProperties": false
+}
