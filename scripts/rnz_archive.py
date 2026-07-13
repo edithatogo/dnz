@@ -313,8 +313,21 @@ def write_caption_files(segments: list[dict[str, Any]], output_dir: Path) -> dic
     return {key: value.name for key, value in paths.items()}
 
 
+def rttm_lines(recording_id: str, rows: Iterable[dict[str, Any]]) -> list[str]:
+    lines = []
+    for row in rows:
+        start = float(row["start"])
+        duration = float(row["end"]) - start
+        speaker = str(row["speaker"])
+        lines.append(
+            f"SPEAKER {recording_id} 1 {start:.3f} {duration:.3f} <NA> <NA> {speaker} <NA> <NA>"
+        )
+    return lines
+
+
 def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: str) -> dict[str, Any]:
     import whisperx
+    from whisperx.diarize import DiarizationPipeline
 
     models = policy["models"]
     device = "cpu"
@@ -328,15 +341,20 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
     except Exception:
         aligned = raw
         quality_flags.append("alignment_unavailable")
+    if not hf_token:
+        raise RuntimeError("HF_TOKEN with gated pyannote model access is required")
     try:
-        diarizer = whisperx.diarize.DiarizationPipeline(token=hf_token, device=device)
+        diarizer = DiarizationPipeline(
+            model_name=models["diarization"], token=hf_token, device=device
+        )
         diarization = diarizer(str(audio))
         aligned = whisperx.assign_word_speakers(diarization, aligned)
-        with (output_dir / "diarization.rttm").open("w", encoding="utf-8") as handle:
-            for turn, _, speaker in diarization.itertracks(yield_label=True):
-                handle.write(f"SPEAKER {audio.stem} 1 {turn.start:.3f} {turn.duration:.3f} <NA> <NA> {speaker} <NA> <NA>\n")
-    except Exception:
-        quality_flags.append("diarization_unavailable")
+        rows = diarization[["start", "end", "speaker"]].to_dict(orient="records")
+        (output_dir / "diarization.rttm").write_text(
+            "\n".join(rttm_lines(audio.stem, rows)) + "\n", encoding="utf-8"
+        )
+    except Exception as exc:
+        raise RuntimeError("speaker diarization failed") from exc
     result = {
         "language": language,
         "segments": aligned.get("segments", []),

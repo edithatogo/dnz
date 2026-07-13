@@ -67,6 +67,16 @@ class RNZArchiveTests(unittest.TestCase):
             self.assertIn("SPEAKER_00", (output / files["srt"]).read_text(encoding="utf-8"))
             self.assertTrue((output / files["vtt"]).read_text(encoding="utf-8").startswith("WEBVTT"))
 
+    def test_rttm_uses_dataframe_style_rows(self):
+        lines = rnz_archive.rttm_lines(
+            "recording",
+            [{"start": 1.25, "end": 3.75, "speaker": "SPEAKER_00"}],
+        )
+        self.assertEqual(
+            "SPEAKER recording 1 1.250 2.500 <NA> <NA> SPEAKER_00 <NA> <NA>",
+            lines[0],
+        )
+
     def test_zero_cost_policy_rejects_paid_services(self):
         with tempfile.TemporaryDirectory() as directory:
             workflows = Path(directory)
