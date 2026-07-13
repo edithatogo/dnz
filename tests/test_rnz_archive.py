@@ -140,6 +140,14 @@ class RNZArchiveTests(unittest.TestCase):
             self.assertIn("SPEAKER_00", (output / files["srt"]).read_text(encoding="utf-8"))
             self.assertTrue((output / files["vtt"]).read_text(encoding="utf-8").startswith("WEBVTT"))
 
+    def test_normalization_selects_audio_and_ignores_attached_art(self):
+        completed = type("Completed", (), {"returncode": 0, "stderr": ""})()
+        with mock.patch.object(rnz_archive.subprocess, "run", return_value=completed) as run:
+            rnz_archive.normalize_audio(Path("source.mp3"), Path("audio.flac"))
+        command = run.call_args.args[0]
+        self.assertIn("0:a:0", command)
+        self.assertIn("-vn", command)
+
     def test_rttm_uses_dataframe_style_rows(self):
         lines = rnz_archive.rttm_lines(
             "recording",

@@ -315,7 +315,11 @@ def ffprobe_duration(path: Path) -> float:
 def normalize_audio(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     completed = subprocess.run(
-        ["ffmpeg", "-nostdin", "-y", "-i", str(source), "-ac", "1", "-ar", "16000", "-c:a", "flac", str(destination)],
+        [
+            "ffmpeg", "-nostdin", "-y", "-i", str(source),
+            "-map", "0:a:0", "-vn", "-sn", "-dn",
+            "-ac", "1", "-ar", "16000", "-c:a", "flac", str(destination),
+        ],
         check=False,
         capture_output=True,
         text=True,
