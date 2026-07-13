@@ -3,12 +3,13 @@
   "$id": "https://github.com/edithatogo/dnz/rnz/enrichment.schema.json",
   "title": "RNZ deterministic transcript enrichment",
   "type": "object",
-  "required": ["language_review_signals", "entity_candidates", "search_entries", "chapter_summaries", "limitations"],
+  "required": ["language_review_signals", "entity_candidates", "search_entries", "chapter_summaries", "orthographic_corrections", "limitations"],
   "properties": {
     "language_review_signals": {"type": "array"},
     "entity_candidates": {"type": "array"},
     "search_entries": {"type": "array"},
     "chapter_summaries": {"type": "array"},
+    "orthographic_corrections": {"type": "array"},
     "limitations": {"type": "array", "items": {"type": "string"}, "minItems": 1}
   },
   "additionalProperties": false

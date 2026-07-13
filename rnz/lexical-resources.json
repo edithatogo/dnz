@@ -1,0 +1,13 @@
+{
+  "version": "operator-curated-20260713-1",
+  "purpose": "Reversible spelling review candidates only; never modify canonical transcript output.",
+  "source_attribution": "Repository-owner curated review resource; each entry requires human confirmation before publication as a correction.",
+  "corrections": {
+    "Maori": "Māori",
+    "maori": "Māori",
+    "hapu": "hapū",
+    "Hapu": "Hapū",
+    "whanau": "whānau",
+    "Whanau": "Whānau"
+  }
+}

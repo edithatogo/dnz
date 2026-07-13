@@ -289,6 +289,24 @@ class RNZArchiveTests(unittest.TestCase):
         self.assertEqual([0], result["chapter_summaries"][0]["cited_segments"])
         self.assertEqual("W452", rnz_archive.phonetic_key("Wellington"))
 
+    def test_fuzzy_search_returns_exact_phonetic_and_fuzzy_matches(self):
+        entries = rnz_archive.transcript_enrichment(
+            [{"start": 0, "end": 2, "text": "Wellington Parliament"}], []
+        )["search_entries"]
+        self.assertEqual("exact", rnz_archive.fuzzy_search("Parliament", entries)[0]["match"])
+        self.assertTrue(rnz_archive.fuzzy_search("Welingtn", entries))
+
+    def test_orthographic_corrections_preserve_original_offsets(self):
+        entries = rnz_archive.transcript_enrichment(
+            [{"start": 4, "end": 8, "text": "Maori hapu"}], [],
+            {"version": "test-1", "corrections": {"Maori": "Māori", "hapu": "hapū"}},
+        )
+        correction = entries["orthographic_corrections"][0]
+        self.assertEqual("Maori hapu", correction["original"])
+        self.assertEqual("Māori hapū", correction["corrected"])
+        self.assertEqual(4, correction["start"])
+        self.assertEqual("review_required", correction["confidence"])
+
     def test_enrichment_schema_requires_every_generated_field(self):
         schema = json.loads((ROOT / "rnz" / "enrichment.schema.json").read_text(encoding="utf-8"))
         enrichment = rnz_archive.transcript_enrichment([], [])

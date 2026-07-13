@@ -21,6 +21,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from difflib import SequenceMatcher
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -610,7 +611,45 @@ def phonetic_key(value: str) -> str:
     return (normalized[0] + "".join(encoded) + "000")[:4]
 
 
-def transcript_enrichment(segments: list[dict[str, Any]], chapters: list[dict[str, Any]]) -> dict[str, Any]:
+def fuzzy_search(query: str, entries: list[dict[str, Any]], limit: int = 20) -> list[dict[str, Any]]:
+    normalized_query = re.sub(r"\s+", " ", query.casefold()).strip()
+    query_phonetics = {phonetic_key(word) for word in re.findall(r"[A-Za-z]+", query) if phonetic_key(word)}
+    results = []
+    for entry in entries:
+        normalized = str(entry.get("normalized", ""))
+        exact = normalized_query in normalized if normalized_query else False
+        phonetic = bool(query_phonetics & set(entry.get("phonetic_terms", [])))
+        ratio = SequenceMatcher(None, normalized_query, normalized).ratio() if normalized_query else 0.0
+        if exact or phonetic or ratio >= 0.55:
+            results.append({
+                "segment": entry["segment"],
+                "start": entry["start"],
+                "end": entry["end"],
+                "text": entry["text"],
+                "match": "exact" if exact else "phonetic" if phonetic else "fuzzy",
+                "score": 1.0 if exact else 0.9 if phonetic else round(ratio, 6),
+            })
+    return sorted(results, key=lambda item: (-item["score"], item["start"]))[:limit]
+
+
+def reversible_corrections(entries: list[dict[str, Any]], resource: dict[str, Any]) -> list[dict[str, Any]]:
+    corrections = resource.get("corrections", {})
+    result = []
+    for entry in entries:
+        original = entry["text"]
+        corrected = original
+        applied = []
+        for source, target in corrections.items():
+            pattern = re.compile(rf"\b{re.escape(source)}\b", re.IGNORECASE)
+            if pattern.search(corrected):
+                corrected = pattern.sub(target, corrected)
+                applied.append({"source": source, "target": target, "resource_version": resource.get("version")})
+        if corrected != original:
+            result.append({"segment": entry["segment"], "start": entry["start"], "end": entry["end"], "original": original, "corrected": corrected, "corrections": applied, "confidence": "review_required"})
+    return result
+
+
+def transcript_enrichment(segments: list[dict[str, Any]], chapters: list[dict[str, Any]], lexical_resource: dict[str, Any] | None = None) -> dict[str, Any]:
     entries = []
     entity_candidates: list[dict[str, Any]] = []
     language_signals = []
@@ -645,11 +684,13 @@ def transcript_enrichment(segments: list[dict[str, Any]], chapters: list[dict[st
         if cited:
             summaries.append({"chapter": chapter_index, "start": start, "text": cited[0]["text"][:280], "cited_segments": [cited[0]["segment"]], "method": "first_transcript_segment_v1"})
     unique_entities = list({(entry["text"], entry["start"]): entry for entry in entity_candidates}.values())
+    corrections = reversible_corrections(entries, lexical_resource or {"version": "none", "corrections": {}})
     return {
         "language_review_signals": language_signals,
         "entity_candidates": unique_entities,
         "search_entries": entries,
         "chapter_summaries": summaries,
+        "orthographic_corrections": corrections,
         "limitations": [
             "Language signals request review and are not language identification.",
             "Entity candidates are unresolved surface forms and are not identity claims.",
@@ -804,7 +845,9 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
         "generated_at": utc_now(),
     }
     analysis = transcript_analysis(result["segments"], duration, rows)
-    enrichment = transcript_enrichment(result["segments"], analysis["chapters"])
+    lexical_path = Path(__file__).resolve().parents[1] / "rnz" / "lexical-resources.json"
+    lexical_resource = load_json(lexical_path) if lexical_path.exists() else None
+    enrichment = transcript_enrichment(result["segments"], analysis["chapters"], lexical_resource)
     audio_quality = audio_quality_metrics(audio)
     if audio_quality["clipped_sample_ratio"] > 0.001:
         analysis["quality_flags"].append("clipping_detected")
@@ -844,6 +887,7 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
         "average_word_confidence": analysis["average_word_confidence"],
         "rms_dbfs": audio_quality["rms_dbfs"],
         "clipped_sample_ratio": audio_quality["clipped_sample_ratio"],
+        "activity_segment_count": len(audio_quality["activity_segments"]),
     }
     return result
 

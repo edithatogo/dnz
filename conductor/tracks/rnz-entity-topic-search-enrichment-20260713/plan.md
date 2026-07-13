@@ -8,6 +8,7 @@
   - [ ] Add evaluated high-confidence authoritative identifier linking.
 - [~] Implement timestamped exact, fuzzy and phonetic search derivatives.
   - [x] Emit canonical offsets, normalized text and deterministic phonetic keys.
-  - [ ] Evaluate fuzzy retrieval and publish measured thresholds.
+  - [x] Add bounded exact, fuzzy and phonetic result ranking with explicit match type and score.
+  - [ ] Evaluate fuzzy retrieval thresholds on reviewed material.
 - [x] Implement deterministic extractive chapter summaries with transcript-segment citations and no inference API.
 - [ ] Evaluate, review and archive the track.
