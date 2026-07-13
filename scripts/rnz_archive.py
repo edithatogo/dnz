@@ -172,6 +172,40 @@ def discover(args: argparse.Namespace) -> int:
     existing = latest_by_record(read_events(args.manifest))
     remaining = args.limit
     collections = policy["collections"]
+    if args.record_id:
+        headers = {"Authentication-Token": api_key} if api_key else None
+        payload = fetch_json(
+            f"https://api.digitalnz.org/v3/records/{args.record_id}.json",
+            {},
+            headers=headers,
+        )
+        record = payload.get("record", {})
+        record_id = str(record.get("id", "")).strip()
+        primary = record.get("primary_collection") or []
+        collection = primary[0] if primary else ""
+        if record_id != args.record_id or collection not in collections:
+            raise ValueError("requested DigitalNZ record is not in an approved RNZ collection")
+        candidates = media_candidates(record)
+        source_url = next(
+            (url for url in candidates if host_allowed(url, policy["allowed_media_domains"])),
+            None,
+        )
+        if not source_url:
+            raise ValueError("requested DigitalNZ record has no allowlisted RNZ source URL")
+        if record_id not in existing:
+            append_event(
+                args.manifest,
+                {
+                    "record_id": record_id,
+                    "event": "discovered",
+                    "rights_basis": policy["rights_basis"],
+                    "source_url": source_url,
+                    "collection": collection,
+                    "title": record.get("title"),
+                    "retry_count": 0,
+                },
+            )
+        return 0
     for collection in collections:
         if remaining <= 0:
             break
@@ -375,6 +409,8 @@ def process(args: argparse.Namespace) -> int:
     events = read_events(args.manifest)
     latest = latest_by_record(events)
     pending = [event for event in latest.values() if event["event"] in {"discovered", "retry"}]
+    if args.record_id:
+        pending = [event for event in pending if event["record_id"] == args.record_id]
     deadline = time.monotonic() + min(args.deadline_minutes, int(policy["deadline_minutes"])) * 60
     selected = pending[: min(args.max_items, int(policy["max_items_per_run"]))]
     hf_token = os.environ.get("HF_TOKEN", "")
@@ -470,6 +506,7 @@ def main(argv: list[str] | None = None) -> int:
     discover_parser.add_argument("--manifest", type=Path, required=True)
     discover_parser.add_argument("--limit", type=int, default=100)
     discover_parser.add_argument("--query")
+    discover_parser.add_argument("--record-id")
     discover_parser.add_argument("--api-key")
     discover_parser.set_defaults(func=discover)
 
@@ -479,6 +516,7 @@ def main(argv: list[str] | None = None) -> int:
     process_parser.add_argument("--max-items", type=int, default=5)
     process_parser.add_argument("--max-retries", type=int, default=3)
     process_parser.add_argument("--deadline-minutes", type=int, default=330)
+    process_parser.add_argument("--record-id")
     process_parser.set_defaults(func=process)
 
     package_parser = subparsers.add_parser("package")

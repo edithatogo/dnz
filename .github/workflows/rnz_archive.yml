@@ -27,6 +27,10 @@ on:
         description: Optional DigitalNZ query or record selector
         required: false
         type: string
+      digitalnz_id:
+        description: Optional exact DigitalNZ record ID
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -135,24 +139,25 @@ jobs:
           DIGITALNZ_API_KEY: ${{ secrets.DIGITALNZ_API_KEY || '' }}
           DISCOVER_LIMIT: ${{ inputs.discover_limit || '100' }}
           RECORD_QUERY: ${{ inputs.record_query || '' }}
+          DIGITALNZ_ID: ${{ inputs.digitalnz_id || '' }}
         run: |
           set -euo pipefail
           args=(--manifest work/state/manifest.jsonl --limit "$DISCOVER_LIMIT")
           if [ -n "$RECORD_QUERY" ]; then args+=(--query "$RECORD_QUERY"); fi
+          if [ -n "$DIGITALNZ_ID" ]; then args+=(--record-id "$DIGITALNZ_ID"); fi
           python scripts/rnz_archive.py discover "${args[@]}"
 
       - name: Process bounded CPU batch
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           MAX_ITEMS: ${{ inputs.max_items || '5' }}
+          DIGITALNZ_ID: ${{ inputs.digitalnz_id || '' }}
           PYANNOTE_METRICS_ENABLED: "0"
         run: |
           set -euo pipefail
-          python scripts/rnz_archive.py process \
-            --manifest work/state/manifest.jsonl \
-            --output work/items \
-            --max-items "$MAX_ITEMS" \
-            --deadline-minutes 330
+          args=(--manifest work/state/manifest.jsonl --output work/items --max-items "$MAX_ITEMS" --deadline-minutes 330)
+          if [ -n "$DIGITALNZ_ID" ]; then args+=(--record-id "$DIGITALNZ_ID"); fi
+          python scripts/rnz_archive.py process "${args[@]}"
 
       - name: Assemble reproducible monthly shard
         run: |

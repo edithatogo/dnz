@@ -59,6 +59,34 @@ class RNZArchiveTests(unittest.TestCase):
             rnz_archive.media_candidates(record),
         )
 
+    def test_exact_record_discovery_uses_requested_digitalnz_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest = Path(directory) / "manifest.jsonl"
+            args = type(
+                "Args",
+                (),
+                {
+                    "policy": ROOT / "rnz" / "archive-policy.json",
+                    "manifest": manifest,
+                    "limit": 1,
+                    "query": None,
+                    "api_key": None,
+                    "record_id": "41680626",
+                },
+            )()
+            response = {
+                "record": {
+                    "id": 41680626,
+                    "title": "Tagata o te moana",
+                    "primary_collection": ["Radio New Zealand"],
+                    "landing_url": "https://www.rnz.co.nz/programmes/audio/2018696673/item",
+                }
+            }
+            with mock.patch.object(rnz_archive, "fetch_json", return_value=response):
+                rnz_archive.discover(args)
+            event = rnz_archive.read_events(manifest)[0]
+            self.assertEqual("41680626", event["record_id"])
+
     def test_audio_extraction_requires_matching_rnz_id(self):
         body = """
         latest-bulletin='{"id":999,"audioSrc":"https://podcast.radionz.co.nz/news/latest.mp3"}'
