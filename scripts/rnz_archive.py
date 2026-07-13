@@ -546,6 +546,8 @@ def audio_quality_metrics(audio: Path) -> dict[str, Any]:
     if process.stdout is None:
         raise RuntimeError("ffmpeg PCM analysis produced no output stream")
     sample_count = clipped = silent = sum_squares = 0
+    window_buffer = array.array("h")
+    activity_segments: list[dict[str, Any]] = []
     remainder = b""
     while chunk := process.stdout.read(1024 * 1024):
         chunk = remainder + chunk
@@ -559,6 +561,26 @@ def audio_quality_metrics(audio: Path) -> dict[str, Any]:
         clipped += sum(abs(value) >= 32760 for value in samples)
         silent += sum(abs(value) <= 32 for value in samples)
         sum_squares += sum(value * value for value in samples)
+        window_buffer.extend(samples)
+        while len(window_buffer) >= 16000:
+            window = window_buffer[:16000]
+            del window_buffer[:16000]
+            window_rms = (sum(value * value for value in window) / len(window)) ** 0.5
+            activity_segments.append({
+                "start": round((len(activity_segments) * 16000) / 16000, 3),
+                "end": round(((len(activity_segments) + 1) * 16000) / 16000, 3),
+                "label": "silence" if window_rms <= 32 else "activity",
+                "rms_dbfs": round(20 * __import__("math").log10(window_rms / 32768), 3) if window_rms else None,
+            })
+    if window_buffer:
+        window_rms = (sum(value * value for value in window_buffer) / len(window_buffer)) ** 0.5
+        start = len(activity_segments)
+        activity_segments.append({
+            "start": round(start, 3),
+            "end": round(start + len(window_buffer) / 16000, 3),
+            "label": "silence" if window_rms <= 32 else "activity",
+            "rms_dbfs": round(20 * __import__("math").log10(window_rms / 32768), 3) if window_rms else None,
+        })
     stderr = process.stderr.read().decode("utf-8", errors="replace") if process.stderr else ""
     if process.wait() != 0:
         raise RuntimeError(f"ffmpeg PCM analysis failed: {stderr[-500:]}")
@@ -569,6 +591,7 @@ def audio_quality_metrics(audio: Path) -> dict[str, Any]:
         "rms_dbfs": round(rms_dbfs, 3) if rms_dbfs is not None else None,
         "clipped_sample_ratio": round(clipped / sample_count, 8) if sample_count else 0.0,
         "near_silence_ratio": round(silent / sample_count, 8) if sample_count else 1.0,
+        "activity_segments": activity_segments,
         "method": "ffmpeg_s16le_mono_16khz_v1",
     }
 

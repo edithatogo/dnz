@@ -273,6 +273,8 @@ class RNZArchiveTests(unittest.TestCase):
         self.assertEqual(4, metrics["sample_count"])
         self.assertEqual(0.25, metrics["clipped_sample_ratio"])
         self.assertEqual(0.25, metrics["near_silence_ratio"])
+        self.assertEqual(1, len(metrics["activity_segments"]))
+        self.assertEqual("activity", metrics["activity_segments"][0]["label"])
 
     def test_enrichment_is_timestamped_reversible_and_review_only(self):
         segments = [
