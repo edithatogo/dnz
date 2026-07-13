@@ -32,8 +32,11 @@
 - [~] Task: Audit account configuration and trigger the bounded pilot when prerequisites pass.
   - [x] Verify GitHub public/free-runner and Hugging Face zero-credit/free-storage state.
   - [x] Configure fail-closed repository variables and production environment.
-  - [ ] Accept gated pyannote Community-1 access with explicit user consent.
-  - [ ] Verify the Actions token can read the gated model.
-  - [ ] Set `RNZ_ARCHIVE_ENABLED=true` and run the bounded pilot.
+  - [x] Accept gated pyannote Community-1 access with explicit user consent (2026-07-13).
+  - [x] Verify the Actions token can read the gated model (Actions run `29244743661`).
+  - [~] Set `RNZ_ARCHIVE_ENABLED=true` and run the bounded pilot.
+    - [x] Enable the fail-closed production gate and start exact-record smoke run `29247010802`.
+    - [~] Verify non-empty Hugging Face round trip after CPU transcription completes.
+    - [ ] Run and manually review the stratified 100-record pilot.
 - [ ] Task: Review fixes, document residual blockers, and archive the track.
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Verification and Rollout' (Protocol in workflow.md)
