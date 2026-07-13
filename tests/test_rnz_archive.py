@@ -92,6 +92,7 @@ class RNZArchiveTests(unittest.TestCase):
                     "query": None,
                     "api_key": None,
                     "record_id": "41680626",
+                    "reprocess": False,
                 },
             )()
             response = {
@@ -107,6 +108,19 @@ class RNZArchiveTests(unittest.TestCase):
             event = rnz_archive.read_events(manifest)[0]
             self.assertEqual("41680626", event["record_id"])
             self.assertEqual(response["record"], event["digitalnz_metadata"])
+
+    def test_exact_record_reprocess_appends_new_discovery_event(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest = Path(directory) / "manifest.jsonl"
+            rnz_archive.append_event(manifest, {"record_id": "41680626", "event": "processed", "rights_basis": "authorized"})
+            args = type("Args", (), {"policy": ROOT / "rnz" / "archive-policy.json", "manifest": manifest, "limit": 1, "query": None, "api_key": None, "record_id": "41680626", "reprocess": True})()
+            response = {"record": {"id": 41680626, "title": "Item", "primary_collection": ["Radio New Zealand"], "landing_url": "https://www.rnz.co.nz/programmes/audio/2018696673/item"}}
+            with mock.patch.object(rnz_archive, "fetch_json", return_value=response):
+                rnz_archive.discover(args)
+            events = rnz_archive.read_events(manifest)
+            self.assertEqual(2, len(events))
+            self.assertEqual("discovered", events[-1]["event"])
+            self.assertTrue(events[-1]["reprocess_requested"])
 
     def test_audio_extraction_requires_matching_rnz_id(self):
         body = """

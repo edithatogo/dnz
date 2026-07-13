@@ -31,6 +31,11 @@ on:
         description: Optional exact DigitalNZ record ID
         required: false
         type: string
+      reprocess:
+        description: Reprocess the exact DigitalNZ ID to generate upgraded derivatives
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -140,14 +145,17 @@ jobs:
           DISCOVER_LIMIT: ${{ inputs.discover_limit || '100' }}
           RECORD_QUERY: ${{ inputs.record_query || '' }}
           DIGITALNZ_ID: ${{ inputs.digitalnz_id || '' }}
+          REPROCESS: ${{ inputs.reprocess || 'false' }}
         run: |
           set -euo pipefail
           args=(--manifest work/state/manifest.jsonl --limit "$DISCOVER_LIMIT")
           if [ -n "$RECORD_QUERY" ]; then args+=(--query "$RECORD_QUERY"); fi
           if [ -n "$DIGITALNZ_ID" ]; then args+=(--record-id "$DIGITALNZ_ID"); fi
+          if [ "$REPROCESS" = "true" ]; then args+=(--reprocess); fi
           python scripts/rnz_archive.py discover "${args[@]}"
 
       - name: Process bounded CPU batch
+        id: process
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           MAX_ITEMS: ${{ inputs.max_items || '5' }}
@@ -158,8 +166,25 @@ jobs:
           args=(--manifest work/state/manifest.jsonl --output work/items --max-items "$MAX_ITEMS" --deadline-minutes 330)
           if [ -n "$DIGITALNZ_ID" ]; then args+=(--record-id "$DIGITALNZ_ID"); fi
           python scripts/rnz_archive.py process "${args[@]}"
+          if find work/items -name provenance.json -print -quit | grep -q .; then
+            echo "has_items=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_items=false" >> "$GITHUB_OUTPUT"
+            echo "No new item derivatives were produced; release publication is skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Persist append-only archive state
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+        run: |
+          set -euo pipefail
+          hf upload "$HF_REPO_ID" work/state/manifest.jsonl rnz/state/manifest.jsonl \
+            --repo-type dataset \
+            --commit-message "data(rnz): persist resumable archive state"
 
       - name: Assemble reproducible monthly shard
+        if: steps.process.outputs.has_items == 'true'
         run: |
           set -euo pipefail
           month="$(date -u +%Y-%m)"
@@ -173,6 +198,7 @@ jobs:
           cp -R "work/release/$month" "work/publish/rnz/releases/$month"
 
       - name: Publish to the fixed public Hugging Face dataset
+        if: steps.process.outputs.has_items == 'true'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
@@ -183,6 +209,7 @@ jobs:
             --commit-message "data(rnz): archive bounded transcription batch"
 
       - name: Verify published shard round trip
+        if: steps.process.outputs.has_items == 'true'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}

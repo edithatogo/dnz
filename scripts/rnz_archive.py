@@ -271,6 +271,8 @@ def discover(args: argparse.Namespace) -> int:
         raise RuntimeError("rights_authorized must be true before discovery")
     api_key = args.api_key or os.environ.get("DIGITALNZ_API_KEY")
     existing = latest_by_record(read_events(args.manifest))
+    if args.reprocess and not args.record_id:
+        raise ValueError("--reprocess requires --record-id")
     remaining = args.limit
     collections = policy["collections"]
     if args.record_id:
@@ -293,7 +295,7 @@ def discover(args: argparse.Namespace) -> int:
         )
         if not source_url:
             raise ValueError("requested DigitalNZ record has no allowlisted RNZ source URL")
-        if record_id not in existing:
+        if record_id not in existing or args.reprocess:
             append_event(
                 args.manifest,
                 {
@@ -306,6 +308,7 @@ def discover(args: argparse.Namespace) -> int:
                     "digitalnz_metadata": record,
                     "metadata_retrieved_at": utc_now(),
                     "retry_count": 0,
+                    "reprocess_requested": bool(args.reprocess),
                 },
             )
         return 0
@@ -967,6 +970,7 @@ def main(argv: list[str] | None = None) -> int:
     discover_parser.add_argument("--query")
     discover_parser.add_argument("--record-id")
     discover_parser.add_argument("--api-key")
+    discover_parser.add_argument("--reprocess", action="store_true")
     discover_parser.set_defaults(func=discover)
 
     process_parser = subparsers.add_parser("process")
