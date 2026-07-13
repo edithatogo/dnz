@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/edithatogo/dnz/rnz/review.schema.json",
+  "title": "RNZ archive review queue item",
+  "type": "object",
+  "required": ["required", "status", "reasons", "created_at", "disposition", "reviewer", "reviewed_at"],
+  "properties": {
+    "required": {"type": "boolean"},
+    "status": {"enum": ["pending", "not_required", "reviewed"]},
+    "reasons": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "created_at": {"type": "string", "format": "date-time"},
+    "disposition": {"type": ["string", "null"]},
+    "reviewer": {"type": ["string", "null"]},
+    "reviewed_at": {"type": ["string", "null"], "format": "date-time"}
+  },
+  "additionalProperties": false
+}

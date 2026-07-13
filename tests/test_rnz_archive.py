@@ -228,7 +228,7 @@ class RNZArchiveTests(unittest.TestCase):
             output = Path(directory)
             required = (
                 "audio.flac", "transcript.srt", "transcript.vtt", "transcript.txt",
-                "diarization.rttm", "analysis.json", "chapters.json",
+                "diarization.rttm", "analysis.json", "chapters.json", "review.json",
             )
             for name in required:
                 (output / name).write_text("content", encoding="utf-8")

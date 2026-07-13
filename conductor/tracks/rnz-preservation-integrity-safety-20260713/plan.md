@@ -10,5 +10,6 @@
   - [x] Verify Zenodo server checksums for every file and download each checksum manifest after publication.
 - [~] Implement conservative sensitive-content review signals and operator workflow.
   - [x] Add review-only signals with a no-automatic-restriction contract.
-  - [ ] Add operator review state, dispositions and audit history.
+  - [x] Add versioned pending/not-required review records, durable reasons and workflow summary counts.
+  - [ ] Add authenticated operator dispositions and append-only review audit history.
 - [ ] Evaluate, review and archive the track.

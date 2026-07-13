@@ -28,6 +28,8 @@
     "models": {"type": "object"},
     "outputs": {"type": "object"},
     "quality_flags": {"type": "array", "items": {"type": "string"}},
+    "review_required": {"type": "boolean"},
+    "review_reasons": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
     "reason": {"type": "string"}
   },
   "additionalProperties": true

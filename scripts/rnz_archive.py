@@ -549,7 +549,7 @@ def transcript_analysis(
 def verify_item_outputs(output_dir: Path, expected_duration: float) -> dict[str, Any]:
     required = (
         "audio.flac", "transcript.json", "transcript.srt", "transcript.vtt",
-        "transcript.txt", "diarization.rttm", "analysis.json", "chapters.json",
+        "transcript.txt", "diarization.rttm", "analysis.json", "chapters.json", "review.json",
     )
     missing = [name for name in required if not (output_dir / name).is_file() or (output_dir / name).stat().st_size == 0]
     if missing:
@@ -628,11 +628,28 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
     analysis = transcript_analysis(result["segments"], duration, rows)
     result["quality_flags"].extend(analysis["quality_flags"])
     result["quality_flags"] = list(dict.fromkeys(result["quality_flags"]))
+    review_reasons = list(
+        dict.fromkeys(
+            [f"quality:{flag}" for flag in result["quality_flags"]]
+            + [f"sensitive:{signal}" for signal in analysis["sensitive_review_signals"]]
+        )
+    )
+    review = {
+        "required": bool(review_reasons),
+        "status": "pending" if review_reasons else "not_required",
+        "reasons": review_reasons,
+        "created_at": utc_now(),
+        "disposition": None,
+        "reviewer": None,
+        "reviewed_at": None,
+    }
     (output_dir / "transcript.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     (output_dir / "analysis.json").write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
     (output_dir / "chapters.json").write_text(json.dumps(analysis["chapters"], ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "review.json").write_text(json.dumps(review, ensure_ascii=False, indent=2), encoding="utf-8")
     result["outputs"] = write_caption_files(result["segments"], output_dir)
-    result["outputs"].update({"analysis": "analysis.json", "chapters": "chapters.json", "rttm": "diarization.rttm"})
+    result["outputs"].update({"analysis": "analysis.json", "chapters": "chapters.json", "review": "review.json", "rttm": "diarization.rttm"})
+    result["review"] = review
     return result
 
 
@@ -712,7 +729,7 @@ def process(args: argparse.Namespace) -> int:
             )
             provenance = {"record_id": record_id, "parent_record_id": item.get("parent_record_id"), "source_url": item["source_url"], "media_url": media_url, "sha256": sha256, "rights_basis": policy["rights_basis"], "models": policy["models"], "integrity": integrity, "duplicate_of": duplicate_of, "generated_at": utc_now()}
             (output_dir / "provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
-            append_event(args.manifest, {**item, "event": "processed", "media_url": media_url, "sha256": sha256, "normalized_sha256": integrity["normalized_sha256"], "duplicate_of": duplicate_of, "size_bytes": size, "duration_seconds": duration, "models": policy["models"], "outputs": result["outputs"], "quality_flags": result["quality_flags"]})
+            append_event(args.manifest, {**item, "event": "processed", "media_url": media_url, "sha256": sha256, "normalized_sha256": integrity["normalized_sha256"], "duplicate_of": duplicate_of, "size_bytes": size, "duration_seconds": duration, "models": policy["models"], "outputs": result["outputs"], "quality_flags": result["quality_flags"], "review_required": result["review"]["required"], "review_reasons": result["review"]["reasons"]})
         except Exception as exc:
             source_path.unlink(missing_ok=True)
             count = int(item.get("retry_count", 0)) + 1
@@ -762,6 +779,7 @@ def summary(args: argparse.Namespace) -> int:
     for event in latest.values():
         counts[event["event"]] = counts.get(event["event"], 0) + 1
     payload = {"timestamp": utc_now(), "records": len(latest), "states": counts}
+    payload["review_required"] = sum(1 for event in latest.values() if event.get("review_required"))
     print(json.dumps(payload, indent=2, sort_keys=True))
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as handle:
@@ -769,6 +787,7 @@ def summary(args: argparse.Namespace) -> int:
             handle.write(f"- Records: {len(latest)}\n")
             for state, count in sorted(counts.items()):
                 handle.write(f"- {state}: {count}\n")
+            handle.write(f"- Review required: {payload['review_required']}\n")
     return 0
 
 
