@@ -1,6 +1,6 @@
 schema_version: 1
 last_updated_utc: 2026-07-13T14:00:00Z
-repository_head: b611505cc40675847bc24f0168cab3178d62d344
+repository_head: 904c5ea
 branch: codex/dnz-modernisation
 active_track: T01
 active_slice: header-auth-cache-isolation-and-exact-zero-pagination
