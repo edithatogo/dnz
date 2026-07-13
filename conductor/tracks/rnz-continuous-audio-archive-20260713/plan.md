@@ -36,7 +36,8 @@
   - [x] Verify the Actions token can read the gated model (Actions run `29244743661`).
   - [~] Set `RNZ_ARCHIVE_ENABLED=true` and run the bounded pilot.
     - [x] Enable the fail-closed production gate and start exact-record smoke run `29247010802`.
-    - [~] Verify non-empty Hugging Face round trip after CPU transcription completes.
+    - [x] Verify non-empty Hugging Face round trip after CPU transcription completes (run `29247010802`).
+    - [x] Start enrichment proof run `29249683277` on the same bounded record after adding zero-cost derivatives.
     - [ ] Run and manually review the stratified 100-record pilot.
 - [ ] Task: Review fixes, document residual blockers, and archive the track.
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Verification and Rollout' (Protocol in workflow.md)
