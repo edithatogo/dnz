@@ -2,7 +2,9 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from email.message import Message
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +59,33 @@ class RNZArchiveTests(unittest.TestCase):
             )
         )
 
+    def test_audio_id_page_rejects_unrelated_fallback_media(self):
+        class Response:
+            headers = Message()
+
+            def __enter__(self):
+                self.headers["Content-Type"] = "text/html"
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def geturl(self):
+                return "https://www.rnz.co.nz/programme/audio/1234/example"
+
+            def read(self, _limit):
+                return b'<audio src="https://podcast.radionz.co.nz/news/latest.mp3">'
+
+        policy = {
+            "allowed_media_domains": ["rnz.co.nz", "radionz.co.nz"],
+            "allowed_content_types": ["audio/mpeg"],
+        }
+        with mock.patch.object(rnz_archive.urllib.request, "urlopen", return_value=Response()):
+            with self.assertRaisesRegex(ValueError, "requested audio ID"):
+                rnz_archive.resolve_media_url(
+                    "https://www.rnz.co.nz/programme/audio/1234/example", policy
+                )
+
     def test_caption_outputs_use_anonymous_speakers(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
@@ -100,6 +129,43 @@ class RNZArchiveTests(unittest.TestCase):
                 "--items", "items",
                 "--output", "release",
             ])
+
+    def test_package_manifest_only_contains_packaged_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "state.jsonl"
+            items = root / "items"
+            release = root / "release"
+            for record_id in ("included", "excluded"):
+                rnz_archive.append_event(
+                    manifest,
+                    {
+                        "record_id": record_id,
+                        "event": "processed",
+                        "title": record_id,
+                        "rights_basis": "authorized",
+                    },
+                )
+            included = items / "2026-07" / "items" / "included"
+            included.mkdir(parents=True)
+            (included / "provenance.json").write_text("{}", encoding="utf-8")
+            args = type(
+                "Args",
+                (),
+                {
+                    "manifest": manifest,
+                    "items": items,
+                    "output": release,
+                    "shard_id": "test",
+                },
+            )()
+            try:
+                rnz_archive.package(args)
+            except ModuleNotFoundError as exc:
+                self.skipTest(f"optional packaging dependency unavailable: {exc}")
+            release_manifest = (release / "manifest-test.jsonl").read_text(encoding="utf-8")
+            self.assertIn("included", release_manifest)
+            self.assertNotIn("excluded", release_manifest)
 
 
 if __name__ == "__main__":

@@ -232,6 +232,8 @@ def resolve_media_url(source_url: str, policy: dict[str, Any]) -> str:
     matching = extract_matching_audio_url(source_url, body)
     if matching and host_allowed(matching, policy["allowed_media_domains"]):
         return matching
+    if re.search(r"/audio/\d+(?:/|$)", urllib.parse.urlparse(source_url).path):
+        raise ValueError("landing page does not contain media for the requested audio ID")
     parser = MediaHTMLParser()
     parser.feed(body)
     for candidate in parser.urls:
@@ -409,11 +411,17 @@ def package(args: argparse.Namespace) -> int:
     import pyarrow.parquet as pq
 
     events = read_events(args.manifest)
-    processed = [event for event in events if event.get("event") == "processed"]
+    packaged_ids = {path.parent.name for path in args.items.rglob("provenance.json")}
+    processed = [
+        event
+        for event in latest_by_record(events).values()
+        if event.get("event") == "processed" and event.get("record_id") in packaged_ids
+    ]
+    release_events = [event for event in events if event.get("record_id") in packaged_ids]
     args.output.mkdir(parents=True, exist_ok=True)
     shard_id = re.sub(r"[^A-Za-z0-9_.-]", "-", args.shard_id)
     pq.write_table(pa.Table.from_pylist(processed), args.output / f"manifest-{shard_id}.parquet")
-    (args.output / f"manifest-{shard_id}.jsonl").write_text("".join(json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n" for event in events), encoding="utf-8")
+    (args.output / f"manifest-{shard_id}.jsonl").write_text("".join(json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n" for event in release_events), encoding="utf-8")
     shard = args.output / f"audio-{shard_id}.tar"
     with tarfile.open(shard, "w") as archive:
         for path in sorted(args.items.rglob("*")):
