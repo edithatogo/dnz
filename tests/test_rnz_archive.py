@@ -253,6 +253,20 @@ class RNZArchiveTests(unittest.TestCase):
     def test_repo_workflows_pass_zero_cost_policy(self):
         policy = json.loads((ROOT / "rnz" / "archive-policy.json").read_text(encoding="utf-8"))
         self.assertEqual([], rnz_archive.validate_zero_cost(ROOT / ".github" / "workflows", policy["hf_repo_id"]))
+        self.assertEqual([], rnz_archive.validate_model_pins(policy))
+
+    def test_model_policy_rejects_moving_or_missing_revisions(self):
+        policy = {
+            "models": {
+                "transcription_primary_repo": "owner/model",
+                "transcription_fallback_repo": "owner/fallback",
+                "diarization": "owner/diarization",
+                "transcription_primary_revision": "main",
+            }
+        }
+        errors = rnz_archive.validate_model_pins(policy)
+        self.assertTrue(any("transcription_primary_revision" in error for error in errors))
+        self.assertTrue(any("diarization_revision" in error for error in errors))
 
     def test_shard_id_is_required(self):
         with self.assertRaises(SystemExit):

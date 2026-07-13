@@ -142,6 +142,18 @@ def validate_zero_cost(workflows: Path, expected_hf_repo: str) -> list[str]:
     return errors
 
 
+def validate_model_pins(policy: dict[str, Any]) -> list[str]:
+    models = policy.get("models", {})
+    errors = []
+    for name in ("transcription_primary_revision", "transcription_fallback_revision", "diarization_revision"):
+        if not re.fullmatch(r"[0-9a-f]{40}", str(models.get(name, ""))):
+            errors.append(f"models.{name} must be an immutable 40-character commit revision")
+    for name in ("transcription_primary_repo", "transcription_fallback_repo", "diarization"):
+        if not re.fullmatch(r"[^/\s]+/[^/\s]+", str(models.get(name, ""))):
+            errors.append(f"models.{name} must be a Hugging Face repository ID")
+    return errors
+
+
 class MediaHTMLParser(html.parser.HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -565,11 +577,17 @@ def verify_item_outputs(output_dir: Path, expected_duration: float) -> dict[str,
 
 def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: str, duration: float) -> dict[str, Any]:
     import whisperx
+    from faster_whisper.utils import download_model
+    from huggingface_hub import snapshot_download
     from whisperx.diarize import DiarizationPipeline
 
     models = policy["models"]
     device = "cpu"
-    model = whisperx.load_model(models["transcription_primary"], device, compute_type="int8", language=None)
+    transcription_path = download_model(
+        models["transcription_primary_repo"],
+        revision=models["transcription_primary_revision"],
+    )
+    model = whisperx.load_model(transcription_path, device, compute_type="int8", language=None)
     raw = model.transcribe(str(audio), batch_size=1)
     language = raw.get("language", "unknown")
     quality_flags: list[str] = []
@@ -583,8 +601,13 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
     if not hf_token:
         raise RuntimeError("HF_TOKEN with gated pyannote model access is required")
     try:
+        diarization_path = snapshot_download(
+            models["diarization"],
+            revision=models["diarization_revision"],
+            token=hf_token,
+        )
         diarizer = DiarizationPipeline(
-            model_name=models["diarization"], token=hf_token, device=device
+            model_name=diarization_path, token=hf_token, device=device
         )
         diarization = diarizer(str(audio))
         aligned = whisperx.assign_word_speakers(diarization, aligned)
@@ -793,6 +816,7 @@ def main(argv: list[str] | None = None) -> int:
 def _policy_command(args: argparse.Namespace) -> int:
     policy = load_json(args.policy)
     errors = validate_zero_cost(args.workflows, policy["hf_repo_id"])
+    errors.extend(validate_model_pins(policy))
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
