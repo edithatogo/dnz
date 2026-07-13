@@ -13,3 +13,5 @@
 - Canonical output remains immutable and every correction links to original word offsets.
 - Evaluation reports separate accuracy for Māori words/names and language-boundary detection.
 - Translation is opt-in and clearly separated from transcription.
+- Production enrichment uses only pinned models and resources that run on standard free public GitHub runners and free public storage.
+- Expensive local model experimentation is optional later work and cannot block canonical archival or trigger a paid hosted fallback.

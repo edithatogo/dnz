@@ -1,0 +1,15 @@
+{
+  "track_id": "rnz-optional-local-compute-20260713",
+  "type": "feature",
+  "status": "blocked",
+  "created_at": "2026-07-13T00:00:00Z",
+  "updated_at": "2026-07-13T00:00:00Z",
+  "description": "Optionally run compute-intensive RNZ enrichment on user-owned hardware after the zero-cost hosted archive is complete",
+  "blocked_by": [
+    "rnz-continuous-audio-archive-20260713",
+    "rnz-broadcast-segmentation-quality-20260713",
+    "rnz-maori-multilingual-enrichment-20260713",
+    "rnz-entity-topic-search-enrichment-20260713",
+    "rnz-preservation-integrity-safety-20260713"
+  ]
+}

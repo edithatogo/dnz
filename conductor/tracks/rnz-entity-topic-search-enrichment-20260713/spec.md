@@ -13,3 +13,5 @@
 - Every entity, topic and summary claim links to transcript spans and confidence.
 - Search indexes preserve canonical word and recording offsets.
 - Evaluation reports precision and recall on a manually reviewed sample.
+- Scheduled production runs remain within standard free public GitHub runners and free public archive capacity, with no paid API, inference, vector database or summarization dependency.
+- Any later local model or index is a reproducible optional derivative and is not required to publish the canonical archive.

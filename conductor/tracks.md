@@ -102,3 +102,9 @@
 - Folder: [rnz-preservation-integrity-safety-20260713](./tracks/rnz-preservation-integrity-safety-20260713)
 
 ---
+
+## [!] Track 27: Optional Local RNZ Compute
+- Folder: [rnz-optional-local-compute-20260713](./tracks/rnz-optional-local-compute-20260713)
+- Status: Blocked until Tracks 22 through 26 are complete, reviewed and archived. Manual user-owned hardware only; zero external spend.
+
+---

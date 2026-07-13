@@ -14,3 +14,5 @@
 - Acoustic labels and chapters are machine-readable, timestamped and independently disableable.
 - False-positive and false-negative measurements are documented for each supported label.
 - All processing uses standard public GitHub runners and passes the zero-cost policy.
+- Every production function must fit within free public GitHub Actions and free public archive capacity; quota exhaustion pauses work instead of selecting paid or local fallback compute.
+- Components that cannot complete reliably within the bounded standard-runner budget are deferred to the optional local-compute track and are not required to finish this track.

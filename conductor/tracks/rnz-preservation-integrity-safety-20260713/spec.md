@@ -14,3 +14,5 @@
 - Duplicate relationships distinguish exact, perceptual, excerpt and rebroadcast matches.
 - Sensitive-content signals create review tasks and never infer protected traits.
 - Integrity audits can reconstruct and verify every published item.
+- Production checks use only standard free public GitHub runners and free public storage; unavailable capacity pauses processing without paid or required local fallback.
+- More compute-intensive similarity analysis may be added later as an optional local derivative without weakening exact-checksum preservation.

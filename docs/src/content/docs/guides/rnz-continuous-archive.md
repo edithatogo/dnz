@@ -13,6 +13,7 @@ The RNZ archive pipeline uses standard Linux GitHub-hosted runners in this publi
 - Production processing remains suspended unless the repository variable `RNZ_ARCHIVE_ENABLED` is exactly `true`.
 - The workflows fail if the repository is not public or the Hugging Face destination is not `edithatogo/digitalnz`.
 - Free-capacity or billing uncertainty stops processing; it never enables paid capacity.
+- `cost_contract` fixes external spend at USD 0, permits only standard public-repository GitHub runners and free public archive tiers, and prohibits paid or required local fallback.
 
 ## Secrets and variables
 
@@ -38,6 +39,8 @@ Compound RNZ landing pages are expanded into a DigitalNZ parent and stable `digi
 
 ## Follow-on enrichment
 
-Conductor tracks 23 through 26 govern acoustic event and music segmentation, Māori and multilingual evaluation, entity-linked search, compound-page extraction, perceptual deduplication, post-publication integrity audits, and sensitive-content review. These functions require measured evaluation before they can run automatically on production recordings.
+Conductor tracks 23 through 26 govern acoustic event and music segmentation, Māori and multilingual evaluation, entity-linked search, compound-page extraction, perceptual deduplication, post-publication integrity audits, and sensitive-content review. Production scope includes only functions that complete on standard free public GitHub runners and fit free public archive capacity. These functions require measured evaluation before they can run automatically on production recordings.
+
+Track 27 reserves more compute-intensive experimentation for a later optional local workflow. It may use user-owned CPU, GPU, memory and disk, but it must be manually invoked, reproducible, resumable and unable to call paid cloud services. Local derivatives may enrich the public archive after validation, but canonical discovery, transcription, preservation and publication cannot depend on local hardware.
 
 Machine transcripts and diarization are research artifacts and may contain errors. Speaker labels are anonymous and do not identify people.

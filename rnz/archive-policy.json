@@ -1,5 +1,13 @@
 {
   "schema_version": 1,
+  "cost_contract": {
+    "maximum_external_spend_usd": 0,
+    "hosted_compute": "github_public_standard_runner_only",
+    "hosted_storage": "free_public_tiers_only",
+    "paid_fallback": false,
+    "local_compute_required": false,
+    "on_free_quota_exhaustion": "pause_and_open_issue"
+  },
   "rights_authorized": true,
   "rights_basis": "User-confirmed authorization for source audio and derivatives on 2026-07-13",
   "collections": [

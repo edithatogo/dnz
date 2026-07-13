@@ -154,6 +154,23 @@ def validate_model_pins(policy: dict[str, Any]) -> list[str]:
     return errors
 
 
+def validate_cost_contract(policy: dict[str, Any]) -> list[str]:
+    contract = policy.get("cost_contract", {})
+    required = {
+        "maximum_external_spend_usd": 0,
+        "hosted_compute": "github_public_standard_runner_only",
+        "hosted_storage": "free_public_tiers_only",
+        "paid_fallback": False,
+        "local_compute_required": False,
+        "on_free_quota_exhaustion": "pause_and_open_issue",
+    }
+    return [
+        f"cost_contract.{name} must be {expected!r}"
+        for name, expected in required.items()
+        if contract.get(name) != expected
+    ]
+
+
 class MediaHTMLParser(html.parser.HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -835,6 +852,7 @@ def main(argv: list[str] | None = None) -> int:
 def _policy_command(args: argparse.Namespace) -> int:
     policy = load_json(args.policy)
     errors = validate_zero_cost(args.workflows, policy["hf_repo_id"])
+    errors.extend(validate_cost_contract(policy))
     errors.extend(validate_model_pins(policy))
     if errors:
         print("\n".join(errors), file=sys.stderr)

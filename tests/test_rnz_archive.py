@@ -15,6 +15,25 @@ SPEC.loader.exec_module(rnz_archive)
 
 
 class RNZArchiveTests(unittest.TestCase):
+    def test_archive_policy_has_fail_closed_zero_cost_contract(self):
+        policy = json.loads((ROOT / "rnz" / "archive-policy.json").read_text(encoding="utf-8"))
+        self.assertEqual([], rnz_archive.validate_cost_contract(policy))
+
+    def test_cost_contract_rejects_paid_or_required_local_compute(self):
+        policy = {
+            "cost_contract": {
+                "maximum_external_spend_usd": 1,
+                "hosted_compute": "github_public_standard_runner_only",
+                "hosted_storage": "free_public_tiers_only",
+                "paid_fallback": True,
+                "local_compute_required": True,
+                "on_free_quota_exhaustion": "upgrade",
+            }
+        }
+        errors = rnz_archive.validate_cost_contract(policy)
+        self.assertEqual(4, len(errors))
+        self.assertTrue(any("maximum_external_spend_usd" in error for error in errors))
+
     def test_host_allowlist_rejects_lookalikes_and_http(self):
         allowed = ["rnz.co.nz"]
         self.assertTrue(rnz_archive.host_allowed("https://media.rnz.co.nz/a.mp3", allowed))
