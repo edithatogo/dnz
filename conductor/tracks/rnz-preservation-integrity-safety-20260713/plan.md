@@ -11,5 +11,5 @@
 - [~] Implement conservative sensitive-content review signals and operator workflow.
   - [x] Add review-only signals with a no-automatic-restriction contract.
   - [x] Add versioned pending/not-required review records, durable reasons and workflow summary counts.
-  - [ ] Add authenticated operator dispositions and append-only review audit history.
+  - [x] Add authenticated manual GitHub dispositions and an append-only public review audit ledger with no automatic content action.
 - [ ] Evaluate, review and archive the track.

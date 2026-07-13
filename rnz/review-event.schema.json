@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/edithatogo/dnz/rnz/review-event.schema.json",
+  "title": "RNZ append-only operator review event",
+  "type": "object",
+  "required": ["schema_version", "review_id", "record_id", "disposition", "note", "actor", "github_run_id", "reviewed_at", "automatic_action"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "review_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "record_id": {"type": "string", "minLength": 1},
+    "disposition": {"enum": ["approved", "needs_correction", "rights_review", "no_action"]},
+    "note": {"type": "string", "maxLength": 1000},
+    "actor": {"type": "string", "minLength": 1},
+    "github_run_id": {"type": "string", "minLength": 1},
+    "reviewed_at": {"type": "string", "format": "date-time"},
+    "automatic_action": {"type": "null"}
+  },
+  "additionalProperties": false
+}

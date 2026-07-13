@@ -1,0 +1,97 @@
+name: RNZ Archive Review Disposition
+
+on:
+  workflow_dispatch:
+    inputs:
+      record_id:
+        description: Processed RNZ archive record ID
+        required: true
+        type: string
+      disposition:
+        description: Review disposition
+        required: true
+        type: choice
+        options:
+          - approved
+          - needs_correction
+          - rights_review
+          - no_action
+      note:
+        description: Concise review note without personal or secret information
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rnz-continuous-audio-archive
+  cancel-in-progress: false
+
+jobs:
+  record-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: rnz-zero-cost-production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Enforce public repository and zero-cost policy
+        env:
+          REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+        run: |
+          set -euo pipefail
+          test "$REPOSITORY_VISIBILITY" = "public"
+          python scripts/rnz_archive.py policy
+
+      - name: Restore archive and review state
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+        run: |
+          set -euo pipefail
+          test "$HF_REPO_ID" = "edithatogo/digitalnz"
+          python -m pip install --disable-pip-version-check "huggingface-hub==0.36.2"
+          mkdir -p work/state
+          hf download "$HF_REPO_ID" --repo-type dataset \
+            --include "rnz/state/manifest.jsonl" \
+            --include "rnz/state/reviews.jsonl" \
+            --local-dir work/hf
+          cp work/hf/rnz/state/manifest.jsonl work/state/manifest.jsonl
+          if [ -f work/hf/rnz/state/reviews.jsonl ]; then
+            cp work/hf/rnz/state/reviews.jsonl work/state/reviews.jsonl
+          else
+            touch work/state/reviews.jsonl
+          fi
+
+      - name: Append authenticated review disposition
+        env:
+          RECORD_ID: ${{ inputs.record_id }}
+          DISPOSITION: ${{ inputs.disposition }}
+          REVIEW_NOTE: ${{ inputs.note }}
+        run: |
+          set -euo pipefail
+          python scripts/rnz_archive.py review \
+            --manifest work/state/manifest.jsonl \
+            --reviews work/state/reviews.jsonl \
+            --record-id "$RECORD_ID" \
+            --disposition "$DISPOSITION" \
+            --note "$REVIEW_NOTE"
+
+      - name: Publish append-only review ledger
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+        run: |
+          set -euo pipefail
+          hf upload "$HF_REPO_ID" work/state/reviews.jsonl rnz/state/reviews.jsonl \
+            --repo-type dataset \
+            --commit-message "data(rnz): append authenticated review disposition"

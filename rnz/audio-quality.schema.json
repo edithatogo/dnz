@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/edithatogo/dnz/rnz/audio-quality.schema.json",
+  "title": "RNZ deterministic audio quality metrics",
+  "type": "object",
+  "required": ["sample_count", "rms_dbfs", "clipped_sample_ratio", "near_silence_ratio", "method"],
+  "properties": {
+    "sample_count": {"type": "integer", "minimum": 0},
+    "rms_dbfs": {"type": ["number", "null"], "maximum": 0},
+    "clipped_sample_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+    "near_silence_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+    "method": {"const": "ffmpeg_s16le_mono_16khz_v1"}
+  },
+  "additionalProperties": false
+}

@@ -1,4 +1,5 @@
 import importlib.util
+import array
 import json
 import tempfile
 import unittest
@@ -237,6 +238,57 @@ class RNZArchiveTests(unittest.TestCase):
         self.assertIn("distressing_subject_matter", analysis["sensitive_review_signals"])
         self.assertTrue(any("must not trigger" in item for item in analysis["limitations"]))
 
+    def test_audio_quality_metrics_streams_pcm(self):
+        pcm = array.array("h", [0, 1000, -1000, 32767]).tobytes()
+        process = mock.Mock()
+        process.stdout = __import__("io").BytesIO(pcm)
+        process.stderr = __import__("io").BytesIO(b"")
+        process.wait.return_value = 0
+        with mock.patch.object(rnz_archive.subprocess, "Popen", return_value=process):
+            metrics = rnz_archive.audio_quality_metrics(Path("audio.flac"))
+        self.assertEqual(4, metrics["sample_count"])
+        self.assertEqual(0.25, metrics["clipped_sample_ratio"])
+        self.assertEqual(0.25, metrics["near_silence_ratio"])
+
+    def test_enrichment_is_timestamped_reversible_and_review_only(self):
+        segments = [
+            {"start": 0.0, "end": 3.0, "text": "Kia ora from Te Pāti Māori in Wellington."},
+            {"start": 8.0, "end": 11.0, "text": "Talofa to Pacific listeners."},
+        ]
+        chapters = [{"start": 0.0, "title": "Opening", "basis": "recording_start"}]
+        result = rnz_archive.transcript_enrichment(segments, chapters)
+        self.assertEqual(2, len(result["search_entries"]))
+        self.assertTrue(result["language_review_signals"])
+        self.assertTrue(all(entity["status"] == "unresolved_candidate" for entity in result["entity_candidates"]))
+        self.assertEqual([0], result["chapter_summaries"][0]["cited_segments"])
+        self.assertEqual("W452", rnz_archive.phonetic_key("Wellington"))
+
+    def test_enrichment_schema_requires_every_generated_field(self):
+        schema = json.loads((ROOT / "rnz" / "enrichment.schema.json").read_text(encoding="utf-8"))
+        enrichment = rnz_archive.transcript_enrichment([], [])
+        self.assertEqual(set(schema["required"]), set(enrichment))
+
+    def test_review_disposition_requires_authenticated_actor_and_is_append_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "manifest.jsonl"
+            reviews = root / "reviews.jsonl"
+            rnz_archive.append_event(manifest, {"record_id": "123", "event": "processed", "rights_basis": "authorized"})
+            args = type("Args", (), {"manifest": manifest, "reviews": reviews, "record_id": "123", "disposition": "approved", "note": "Checked timestamps"})()
+            with mock.patch.dict("os.environ", {"GITHUB_ACTOR": "reviewer", "GITHUB_RUN_ID": "42"}, clear=True):
+                rnz_archive.record_review(args)
+                rnz_archive.record_review(args)
+            events = [json.loads(line) for line in reviews.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(2, len(events))
+            self.assertNotEqual(events[0]["review_id"], events[1]["review_id"])
+            self.assertIsNone(events[0]["automatic_action"])
+
+    def test_review_disposition_rejects_local_unauthenticated_use(self):
+        args = type("Args", (), {"disposition": "approved"})()
+        with mock.patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "authenticated GitHub Actions"):
+                rnz_archive.record_review(args)
+
     def test_analysis_schema_requires_every_generated_field(self):
         schema = json.loads((ROOT / "rnz" / "analysis.schema.json").read_text(encoding="utf-8"))
         analysis = rnz_archive.transcript_analysis([], 60.0, [])
@@ -248,6 +300,7 @@ class RNZArchiveTests(unittest.TestCase):
             required = (
                 "audio.flac", "transcript.srt", "transcript.vtt", "transcript.txt",
                 "diarization.rttm", "analysis.json", "chapters.json", "review.json",
+                "audio-quality.json", "enrichment.json",
             )
             for name in required:
                 (output / name).write_text("content", encoding="utf-8")

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import array
 import hashlib
 import html
 import html.parser
@@ -56,6 +57,8 @@ SENSITIVE_REVIEW_TERMS = {
     "victims_or_survivors": (" victim ", " survivor ", " bereaved "),
     "distressing_subject_matter": (" suicide ", " sexual assault ", " family violence ", " graphic content "),
 }
+MAORI_REVIEW_TERMS = {"te", "ngā", "nga", "iwi", "hapū", "hapu", "marae", "whānau", "whanau", "māori", "maori"}
+PACIFIC_REVIEW_TERMS = {"talofa", "fa'afetai", "mālō", "malo", "bula", "kia orana", "fakaalofa"}
 
 
 def utc_now() -> str:
@@ -498,6 +501,108 @@ def overlap_seconds(rows: list[dict[str, Any]]) -> float:
     return overlap
 
 
+def audio_quality_metrics(audio: Path) -> dict[str, Any]:
+    """Measure normalized PCM without loading the recording into memory."""
+    process = subprocess.Popen(
+        [
+            "ffmpeg", "-nostdin", "-v", "error", "-i", str(audio),
+            "-map", "0:a:0", "-ac", "1", "-ar", "16000", "-f", "s16le", "-",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if process.stdout is None:
+        raise RuntimeError("ffmpeg PCM analysis produced no output stream")
+    sample_count = clipped = silent = sum_squares = 0
+    remainder = b""
+    while chunk := process.stdout.read(1024 * 1024):
+        chunk = remainder + chunk
+        remainder = chunk[-1:] if len(chunk) % 2 else b""
+        usable = chunk[:-1] if remainder else chunk
+        samples = array.array("h")
+        samples.frombytes(usable)
+        if sys.byteorder != "little":
+            samples.byteswap()
+        sample_count += len(samples)
+        clipped += sum(abs(value) >= 32760 for value in samples)
+        silent += sum(abs(value) <= 32 for value in samples)
+        sum_squares += sum(value * value for value in samples)
+    stderr = process.stderr.read().decode("utf-8", errors="replace") if process.stderr else ""
+    if process.wait() != 0:
+        raise RuntimeError(f"ffmpeg PCM analysis failed: {stderr[-500:]}")
+    rms = (sum_squares / sample_count) ** 0.5 if sample_count else 0.0
+    rms_dbfs = 20 * __import__("math").log10(rms / 32768) if rms else None
+    return {
+        "sample_count": sample_count,
+        "rms_dbfs": round(rms_dbfs, 3) if rms_dbfs is not None else None,
+        "clipped_sample_ratio": round(clipped / sample_count, 8) if sample_count else 0.0,
+        "near_silence_ratio": round(silent / sample_count, 8) if sample_count else 1.0,
+        "method": "ffmpeg_s16le_mono_16khz_v1",
+    }
+
+
+def phonetic_key(value: str) -> str:
+    normalized = re.sub(r"[^A-Z]", "", value.upper())
+    if not normalized:
+        return ""
+    groups = {**dict.fromkeys("BFPV", "1"), **dict.fromkeys("CGJKQSXZ", "2"), **dict.fromkeys("DT", "3"), **dict.fromkeys("L", "4"), **dict.fromkeys("MN", "5"), **dict.fromkeys("R", "6")}
+    encoded, previous = [], groups.get(normalized[0], "")
+    for letter in normalized[1:]:
+        code = groups.get(letter, "")
+        if code and code != previous:
+            encoded.append(code)
+        previous = code
+    return (normalized[0] + "".join(encoded) + "000")[:4]
+
+
+def transcript_enrichment(segments: list[dict[str, Any]], chapters: list[dict[str, Any]]) -> dict[str, Any]:
+    entries = []
+    entity_candidates: list[dict[str, Any]] = []
+    language_signals = []
+    for index, segment in enumerate(segments):
+        text = str(segment.get("text", "")).strip()
+        lower_words = set(re.findall(r"[\wāēīōūĀĒĪŌŪ']+", text.lower()))
+        signals = []
+        if lower_words & MAORI_REVIEW_TERMS:
+            signals.append("possible_te_reo_maori_or_names")
+        if any(term in text.lower() for term in PACIFIC_REVIEW_TERMS):
+            signals.append("possible_pacific_language")
+        if signals:
+            language_signals.append({"segment": index, "start": float(segment["start"]), "signals": signals})
+        tokens = sorted(set(re.findall(r"\b[A-ZĀĒĪŌŪ][\wāēīōūĀĒĪŌŪ'-]+(?:\s+[A-ZĀĒĪŌŪ][\wāēīōūĀĒĪŌŪ'-]+){0,3}", text)))
+        for token in tokens:
+            entity_candidates.append({"text": token, "start": float(segment["start"]), "status": "unresolved_candidate"})
+        entries.append(
+            {
+                "segment": index,
+                "start": float(segment["start"]),
+                "end": float(segment["end"]),
+                "text": text,
+                "normalized": re.sub(r"\s+", " ", text.casefold()).strip(),
+                "phonetic_terms": sorted({phonetic_key(word) for word in re.findall(r"[A-Za-z]+", text) if phonetic_key(word)}),
+            }
+        )
+    summaries = []
+    for chapter_index, chapter in enumerate(chapters):
+        start = float(chapter["start"])
+        end = float(chapters[chapter_index + 1]["start"]) if chapter_index + 1 < len(chapters) else float("inf")
+        cited = [entry for entry in entries if start <= entry["start"] < end and entry["text"]]
+        if cited:
+            summaries.append({"chapter": chapter_index, "start": start, "text": cited[0]["text"][:280], "cited_segments": [cited[0]["segment"]], "method": "first_transcript_segment_v1"})
+    unique_entities = list({(entry["text"], entry["start"]): entry for entry in entity_candidates}.values())
+    return {
+        "language_review_signals": language_signals,
+        "entity_candidates": unique_entities,
+        "search_entries": entries,
+        "chapter_summaries": summaries,
+        "limitations": [
+            "Language signals request review and are not language identification.",
+            "Entity candidates are unresolved surface forms and are not identity claims.",
+            "Summaries are extractive transcript citations and may reproduce transcription errors.",
+        ],
+    }
+
+
 def transcript_analysis(
     segments: list[dict[str, Any]], duration: float, diarization_rows: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -567,6 +672,7 @@ def verify_item_outputs(output_dir: Path, expected_duration: float) -> dict[str,
     required = (
         "audio.flac", "transcript.json", "transcript.srt", "transcript.vtt",
         "transcript.txt", "diarization.rttm", "analysis.json", "chapters.json", "review.json",
+        "audio-quality.json", "enrichment.json",
     )
     missing = [name for name in required if not (output_dir / name).is_file() or (output_dir / name).stat().st_size == 0]
     if missing:
@@ -643,6 +749,12 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
         "generated_at": utc_now(),
     }
     analysis = transcript_analysis(result["segments"], duration, rows)
+    enrichment = transcript_enrichment(result["segments"], analysis["chapters"])
+    audio_quality = audio_quality_metrics(audio)
+    if audio_quality["clipped_sample_ratio"] > 0.001:
+        analysis["quality_flags"].append("clipping_detected")
+    if audio_quality["near_silence_ratio"] > 0.9:
+        analysis["quality_flags"].append("mostly_near_silence")
     result["quality_flags"].extend(analysis["quality_flags"])
     result["quality_flags"] = list(dict.fromkeys(result["quality_flags"]))
     review_reasons = list(
@@ -663,9 +775,11 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
     (output_dir / "transcript.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     (output_dir / "analysis.json").write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
     (output_dir / "chapters.json").write_text(json.dumps(analysis["chapters"], ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "audio-quality.json").write_text(json.dumps(audio_quality, indent=2), encoding="utf-8")
+    (output_dir / "enrichment.json").write_text(json.dumps(enrichment, ensure_ascii=False, indent=2), encoding="utf-8")
     (output_dir / "review.json").write_text(json.dumps(review, ensure_ascii=False, indent=2), encoding="utf-8")
     result["outputs"] = write_caption_files(result["segments"], output_dir)
-    result["outputs"].update({"analysis": "analysis.json", "chapters": "chapters.json", "review": "review.json", "rttm": "diarization.rttm"})
+    result["outputs"].update({"analysis": "analysis.json", "audio_quality": "audio-quality.json", "chapters": "chapters.json", "enrichment": "enrichment.json", "review": "review.json", "rttm": "diarization.rttm"})
     result["review"] = review
     return result
 
@@ -808,6 +922,36 @@ def summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def record_review(args: argparse.Namespace) -> int:
+    allowed = {"approved", "needs_correction", "rights_review", "no_action"}
+    if args.disposition not in allowed:
+        raise ValueError(f"disposition must be one of: {', '.join(sorted(allowed))}")
+    actor = os.environ.get("GITHUB_ACTOR", "").strip()
+    run_id = os.environ.get("GITHUB_RUN_ID", "").strip()
+    if not actor or not run_id:
+        raise RuntimeError("review dispositions require an authenticated GitHub Actions actor and run ID")
+    latest = latest_by_record(read_events(args.manifest))
+    item = latest.get(args.record_id)
+    if not item or item.get("event") != "processed":
+        raise ValueError("review record must reference a processed archive item")
+    event = {
+        "schema_version": 1,
+        "review_id": uuid.uuid4().hex,
+        "record_id": args.record_id,
+        "disposition": args.disposition,
+        "note": args.note[:1000],
+        "actor": actor,
+        "github_run_id": run_id,
+        "reviewed_at": utc_now(),
+        "automatic_action": None,
+    }
+    args.reviews.parent.mkdir(parents=True, exist_ok=True)
+    with args.reviews.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n")
+    print(json.dumps(event, indent=2, ensure_ascii=False))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--policy", type=Path, default=Path("rnz/archive-policy.json"))
@@ -844,6 +988,14 @@ def main(argv: list[str] | None = None) -> int:
     summary_parser = subparsers.add_parser("summary")
     summary_parser.add_argument("--manifest", type=Path, required=True)
     summary_parser.set_defaults(func=summary)
+
+    review_parser = subparsers.add_parser("review")
+    review_parser.add_argument("--manifest", type=Path, required=True)
+    review_parser.add_argument("--reviews", type=Path, required=True)
+    review_parser.add_argument("--record-id", required=True)
+    review_parser.add_argument("--disposition", required=True)
+    review_parser.add_argument("--note", default="")
+    review_parser.set_defaults(func=record_review)
 
     args = parser.parse_args(argv)
     return int(args.func(args))
