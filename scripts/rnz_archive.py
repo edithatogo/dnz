@@ -356,7 +356,7 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
             "\n".join(rttm_lines(audio.stem, rows)) + "\n", encoding="utf-8"
         )
     except Exception as exc:
-        raise RuntimeError("speaker diarization failed") from exc
+        raise RuntimeError(f"speaker diarization failed: {exc}") from exc
     result = {
         "language": language,
         "segments": aligned.get("segments", []),
@@ -402,7 +402,9 @@ def process(args: argparse.Namespace) -> int:
             source_path.unlink(missing_ok=True)
             count = int(item.get("retry_count", 0)) + 1
             event = "retry" if count <= args.max_retries else "rejected"
-            append_event(args.manifest, {**item, "event": event, "retry_count": count, "reason": str(exc)[:500]})
+            reason = str(exc)[:500]
+            print(f"record {record_id} {event}: {reason}", file=sys.stderr, flush=True)
+            append_event(args.manifest, {**item, "event": event, "retry_count": count, "reason": reason})
     return 0
 
 
