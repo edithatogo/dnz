@@ -35,6 +35,21 @@ FORBIDDEN_WORKFLOW_PATTERNS = {
 }
 ALLOWED_RUNNER = re.compile(r"^\s*runs-on:\s*ubuntu-latest\s*(?:#.*)?$", re.M)
 MEDIA_EXTENSIONS = (".mp3", ".m4a", ".mp4", ".ogg", ".oga", ".wav", ".flac")
+TOPIC_TERMS = {
+    "parliament_and_politics": ("parliament", "minister", "government", "election", "mp ", "political party"),
+    "te_tiriti_and_maori_affairs": ("te tiriti", "waitangi", "iwi", "hapu", "hapū", "marae", "maori", "māori"),
+    "health": ("health", "hospital", "patient", "doctor", "nurse", "covid"),
+    "housing": ("housing", "rent", "tenant", "homeless", "mortgage"),
+    "justice_and_law": ("court", "judge", "law", "police", "justice", "sentence"),
+    "environment_and_climate": ("climate", "environment", "emissions", "conservation", "flood", "drought"),
+    "foreign_affairs_and_pacific": ("pacific", "foreign affairs", "diplomat", "samoa", "tonga", "fiji", "vanuatu"),
+}
+SECTION_TERMS = {
+    "headlines": ("headlines", "coming up", "in the news"),
+    "weather": ("weather forecast", "the forecast", "degrees", "showers"),
+    "interview": ("joining us", "my guest", "welcome to the programme"),
+    "credits": ("produced by", "executive producer", "you have been listening"),
+}
 
 
 def utc_now() -> str:
@@ -368,7 +383,76 @@ def rttm_lines(recording_id: str, rows: Iterable[dict[str, Any]]) -> list[str]:
     return lines
 
 
-def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: str) -> dict[str, Any]:
+def overlap_seconds(rows: list[dict[str, Any]]) -> float:
+    intervals = sorted((float(row["start"]), float(row["end"])) for row in rows)
+    overlap = 0.0
+    previous_end = 0.0
+    for start, end in intervals:
+        overlap += max(0.0, min(previous_end, end) - start)
+        previous_end = max(previous_end, end)
+    return overlap
+
+
+def transcript_analysis(
+    segments: list[dict[str, Any]], duration: float, diarization_rows: list[dict[str, Any]]
+) -> dict[str, Any]:
+    spoken = [segment for segment in segments if str(segment.get("text", "")).strip()]
+    speech_seconds = sum(max(0.0, float(s["end"]) - float(s["start"])) for s in spoken)
+    words = [word for segment in spoken for word in segment.get("words", [])]
+    scores = [float(word["score"]) for word in words if word.get("score") is not None]
+    normalized = [re.sub(r"\W+", " ", str(s["text"]).lower()).strip() for s in spoken]
+    repeats = sum(1 for previous, current in zip(normalized, normalized[1:]) if current and current == previous)
+    full_text = " ".join(normalized)
+    topic_tags = [topic for topic, terms in TOPIC_TERMS.items() if any(term in full_text for term in terms)]
+    section_hints = [
+        {"type": kind, "start": float(segment["start"]), "text": str(segment["text"]).strip()}
+        for segment in spoken
+        for kind, terms in SECTION_TERMS.items()
+        if any(term in str(segment["text"]).lower() for term in terms)
+    ]
+    chapters = []
+    for index, segment in enumerate(spoken):
+        if index == 0 or float(segment["start"]) - float(spoken[index - 1]["end"]) >= 5.0:
+            chapters.append(
+                {
+                    "start": float(segment["start"]),
+                    "title": str(segment["text"]).strip()[:120],
+                    "basis": "speech_after_pause" if index else "recording_start",
+                }
+            )
+    coverage = min(1.0, speech_seconds / duration) if duration > 0 else 0.0
+    quality_flags = []
+    if coverage < 0.1:
+        quality_flags.append("possible_music_or_non_speech")
+    if scores and sum(scores) / len(scores) < 0.65:
+        quality_flags.append("low_word_confidence")
+    if repeats >= 3:
+        quality_flags.append("repetition_detected")
+    if not chapters:
+        quality_flags.append("no_speech_segments")
+    maori_markers = re.findall(r"\b(?:te|ngā|nga|iwi|hapū|hapu|marae|whānau|whanau|māori|maori)\b", full_text)
+    if maori_markers:
+        quality_flags.append("maori_language_or_names_review_recommended")
+    return {
+        "speech_coverage": round(coverage, 6),
+        "average_word_confidence": round(sum(scores) / len(scores), 6) if scores else None,
+        "adjacent_repeated_segments": repeats,
+        "speaker_count": len({row.get("speaker") for row in diarization_rows if row.get("speaker")}),
+        "overlap_seconds": round(overlap_seconds(diarization_rows), 3),
+        "topics": topic_tags,
+        "section_hints": section_hints,
+        "chapters": chapters,
+        "quality_flags": list(dict.fromkeys(quality_flags)),
+        "maori_marker_count": len(maori_markers),
+        "limitations": [
+            "Topic and section tags are deterministic search hints, not editorial classifications.",
+            "Māori markers trigger review and do not constitute language identification.",
+            "Speaker labels are anonymous and must not be used for speaker identification.",
+        ],
+    }
+
+
+def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: str, duration: float) -> dict[str, Any]:
     import whisperx
     from whisperx.diarize import DiarizationPipeline
 
@@ -378,6 +462,7 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
     raw = model.transcribe(str(audio), batch_size=1)
     language = raw.get("language", "unknown")
     quality_flags: list[str] = []
+    rows: list[dict[str, Any]] = []
     try:
         align_model, metadata = whisperx.load_align_model(language_code=language, device=device)
         aligned = whisperx.align(raw["segments"], align_model, metadata, str(audio), device, return_char_alignments=False)
@@ -406,8 +491,14 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
         "quality_flags": quality_flags,
         "generated_at": utc_now(),
     }
+    analysis = transcript_analysis(result["segments"], duration, rows)
+    result["quality_flags"].extend(analysis["quality_flags"])
+    result["quality_flags"] = list(dict.fromkeys(result["quality_flags"]))
     (output_dir / "transcript.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "analysis.json").write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "chapters.json").write_text(json.dumps(analysis["chapters"], ensure_ascii=False, indent=2), encoding="utf-8")
     result["outputs"] = write_caption_files(result["segments"], output_dir)
+    result["outputs"].update({"analysis": "analysis.json", "chapters": "chapters.json", "rttm": "diarization.rttm"})
     return result
 
 
@@ -437,7 +528,7 @@ def process(args: argparse.Namespace) -> int:
                 raise ValueError("media exceeds maximum duration")
             normalize_audio(source_path, normalized)
             append_event(args.manifest, {**item, "event": "downloaded", "media_url": media_url, "sha256": sha256, "size_bytes": size, "content_type": content_type, "duration_seconds": duration})
-            result = transcribe(normalized, output_dir, policy, hf_token)
+            result = transcribe(normalized, output_dir, policy, hf_token, duration)
             provenance = {"record_id": record_id, "source_url": item["source_url"], "media_url": media_url, "sha256": sha256, "rights_basis": policy["rights_basis"], "models": policy["models"], "generated_at": utc_now()}
             (output_dir / "provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
             append_event(args.manifest, {**item, "event": "processed", "media_url": media_url, "sha256": sha256, "size_bytes": size, "duration_seconds": duration, "models": policy["models"], "outputs": result["outputs"], "quality_flags": result["quality_flags"]})

@@ -11,6 +11,7 @@ Build a resumable GitHub Actions pipeline that discovers rights-cleared RNZ reco
 - Maintain an append-only item manifest with minimal provenance, checksums, state transitions, retries, models, and archive locations; refresh DigitalNZ-derived metadata within its permitted cache window.
 - Allow only HTTPS media from configured RNZ domains, with redirect, size, duration, type, and checksum validation.
 - Transcribe with pinned faster-whisper models, align supported languages with WhisperX, and diarize anonymously with pinned pyannote Community-1.
+- Emit deterministic transcript quality, speech-coverage, overlap, chapter, broadcast-section, Māori-review, and public-policy topic hints without identifying speakers or replacing canonical text.
 - Publish WebDataset audio shards, Parquet metadata/transcripts, captions, RTTM, checksums, and provenance to a public Hugging Face dataset.
 - Publish changed-content-only monthly Zenodo versions below the free record limits.
 - Pause and open a durable issue when any step would require paid compute, paid storage, or unverified billing state.
@@ -30,6 +31,7 @@ Build a resumable GitHub Actions pipeline that discovers rights-cleared RNZ reco
 - Production workflows never fetch RNZ media during pull-request validation.
 - A 100-item pilot mode and bounded historical backfill mode are available.
 - Workflow summaries report progress, failures, free-capacity state, and model provenance.
+- Canonical item packages include separate `analysis.json` and `chapters.json` derivatives with explicit limitations.
 - Account audit documents GitHub visibility/budget and Hugging Face billing/resource state without claiming unverifiable settings.
 
 ## Out of Scope

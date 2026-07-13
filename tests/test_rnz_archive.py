@@ -158,6 +158,38 @@ class RNZArchiveTests(unittest.TestCase):
             lines[0],
         )
 
+    def test_transcript_analysis_flags_broadcast_topics_maori_and_overlap(self):
+        segments = [
+            {
+                "start": 0.0,
+                "end": 4.0,
+                "text": "Headlines from Parliament and Te Tiriti negotiations",
+                "words": [{"word": "Headlines", "score": 0.9}],
+            },
+            {
+                "start": 10.0,
+                "end": 14.0,
+                "text": "Joining us to discuss iwi and housing",
+                "words": [{"word": "housing", "score": 0.8}],
+            },
+        ]
+        rows = [
+            {"start": 0.0, "end": 5.0, "speaker": "SPEAKER_00"},
+            {"start": 4.0, "end": 8.0, "speaker": "SPEAKER_01"},
+        ]
+        analysis = rnz_archive.transcript_analysis(segments, 20.0, rows)
+        self.assertIn("parliament_and_politics", analysis["topics"])
+        self.assertIn("te_tiriti_and_maori_affairs", analysis["topics"])
+        self.assertIn("maori_language_or_names_review_recommended", analysis["quality_flags"])
+        self.assertEqual(2, analysis["speaker_count"])
+        self.assertEqual(1.0, analysis["overlap_seconds"])
+        self.assertEqual(2, len(analysis["chapters"]))
+
+    def test_transcript_analysis_flags_low_speech_coverage(self):
+        analysis = rnz_archive.transcript_analysis([], 60.0, [])
+        self.assertIn("possible_music_or_non_speech", analysis["quality_flags"])
+        self.assertIn("no_speech_segments", analysis["quality_flags"])
+
     def test_zero_cost_policy_rejects_paid_services(self):
         with tempfile.TemporaryDirectory() as directory:
             workflows = Path(directory)

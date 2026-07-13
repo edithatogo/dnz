@@ -82,3 +82,23 @@
 - Folder: [rnz-continuous-audio-archive-20260713](./tracks/rnz-continuous-audio-archive-20260713)
 
 ---
+
+## [ ] Track 23: RNZ Broadcast Segmentation & Quality
+- Folder: [rnz-broadcast-segmentation-quality-20260713](./tracks/rnz-broadcast-segmentation-quality-20260713)
+
+---
+
+## [ ] Track 24: RNZ Māori & Multilingual Enrichment
+- Folder: [rnz-maori-multilingual-enrichment-20260713](./tracks/rnz-maori-multilingual-enrichment-20260713)
+
+---
+
+## [ ] Track 25: RNZ Entity, Topic & Search Enrichment
+- Folder: [rnz-entity-topic-search-enrichment-20260713](./tracks/rnz-entity-topic-search-enrichment-20260713)
+
+---
+
+## [ ] Track 26: RNZ Preservation Integrity & Sensitive-Content Safety
+- Folder: [rnz-preservation-integrity-safety-20260713](./tracks/rnz-preservation-integrity-safety-20260713)
+
+---
