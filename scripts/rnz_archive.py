@@ -314,12 +314,15 @@ def ffprobe_duration(path: Path) -> float:
 
 def normalize_audio(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
+    completed = subprocess.run(
         ["ffmpeg", "-nostdin", "-y", "-i", str(source), "-ac", "1", "-ar", "16000", "-c:a", "flac", str(destination)],
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        check=False,
+        capture_output=True,
+        text=True,
     )
+    if completed.returncode:
+        details = completed.stderr.strip().splitlines()[-3:]
+        raise RuntimeError(f"ffmpeg normalization failed: {' | '.join(details)}")
 
 
 def seconds_timestamp(value: float, separator: str = ",") -> str:
