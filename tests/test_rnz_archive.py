@@ -33,6 +33,22 @@ class RNZArchiveTests(unittest.TestCase):
             self.assertNotEqual(first["event_id"], second["event_id"])
             self.assertEqual("retry", rnz_archive.latest_by_record(events)["123"]["event"])
 
+    def test_append_event_replaces_inherited_identity_and_timestamp(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest = Path(directory) / "manifest.jsonl"
+            event = rnz_archive.append_event(
+                manifest,
+                {
+                    "record_id": "123",
+                    "event": "retry",
+                    "rights_basis": "authorized",
+                    "event_id": "inherited",
+                    "timestamp": "2000-01-01T00:00:00Z",
+                },
+            )
+            self.assertNotEqual("inherited", event["event_id"])
+            self.assertNotEqual("2000-01-01T00:00:00Z", event["timestamp"])
+
     def test_media_candidates_are_ordered_and_deduplicated(self):
         record = {
             "object_url": ["https://rnz.co.nz/a.mp3", "https://rnz.co.nz/a.mp3"],
@@ -166,6 +182,24 @@ class RNZArchiveTests(unittest.TestCase):
             release_manifest = (release / "manifest-test.jsonl").read_text(encoding="utf-8")
             self.assertIn("included", release_manifest)
             self.assertNotIn("excluded", release_manifest)
+
+    def test_package_rejects_empty_shard(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "state.jsonl"
+            manifest.write_text("", encoding="utf-8")
+            args = type(
+                "Args",
+                (),
+                {
+                    "manifest": manifest,
+                    "items": root / "items",
+                    "output": root / "release",
+                    "shard_id": "empty",
+                },
+            )()
+            with self.assertRaisesRegex(RuntimeError, "empty archive shard"):
+                rnz_archive.package(args)
 
 
 if __name__ == "__main__":

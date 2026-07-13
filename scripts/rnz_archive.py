@@ -60,8 +60,8 @@ def host_allowed(url: str, allowed_domains: Iterable[str]) -> bool:
 
 def append_event(path: Path, event: dict[str, Any]) -> dict[str, Any]:
     payload = dict(event)
-    payload.setdefault("timestamp", utc_now())
-    payload.setdefault("event_id", uuid.uuid4().hex)
+    payload["timestamp"] = utc_now()
+    payload["event_id"] = uuid.uuid4().hex
     required = ("record_id", "event", "rights_basis")
     missing = [key for key in required if not payload.get(key)]
     if missing:
@@ -407,11 +407,14 @@ def process(args: argparse.Namespace) -> int:
 
 
 def package(args: argparse.Namespace) -> int:
+    events = read_events(args.manifest)
+    packaged_ids = {path.parent.name for path in args.items.rglob("provenance.json")}
+    if not packaged_ids:
+        raise RuntimeError("refusing to publish an empty archive shard")
+
     import pyarrow as pa
     import pyarrow.parquet as pq
 
-    events = read_events(args.manifest)
-    packaged_ids = {path.parent.name for path in args.items.rglob("provenance.json")}
     processed = [
         event
         for event in latest_by_record(events).values()
