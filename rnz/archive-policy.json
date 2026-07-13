@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "rights_authorized": true,
+  "rights_basis": "User-confirmed authorization for source audio and derivatives on 2026-07-13",
+  "collections": [
+    "Radio New Zealand",
+    "Radio New Zealand YouTube",
+    "The Wireless",
+    "The Wireless YouTube",
+    "RNZ Music",
+    "Best of Storytime RNZ"
+  ],
+  "allowed_media_domains": [
+    "rnz.co.nz",
+    "www.rnz.co.nz",
+    "media.rnz.co.nz",
+    "audio.rnz.co.nz",
+    "podcast.radionz.co.nz"
+  ],
+  "allowed_content_types": [
+    "audio/mpeg",
+    "audio/mp4",
+    "audio/ogg",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/flac",
+    "video/mp4"
+  ],
+  "max_download_bytes": 1073741824,
+  "max_duration_seconds": 21600,
+  "max_items_per_run": 5,
+  "pilot_size": 100,
+  "deadline_minutes": 330,
+  "hf_repo_id": "edithatogo/digitalnz",
+  "hf_repo_type": "dataset",
+  "hf_namespace": "edithatogo",
+  "zenodo_max_bytes": 45000000000,
+  "zenodo_max_files": 100,
+  "models": {
+    "transcription_primary": "large-v3-turbo",
+    "transcription_fallback": "large-v3",
+    "diarization": "pyannote/speaker-diarization-community-1",
+    "whisperx_version": "3.8.6",
+    "faster_whisper_version": "1.2.1",
+    "pyannote_audio_version": "4.0.7"
+  }
+}

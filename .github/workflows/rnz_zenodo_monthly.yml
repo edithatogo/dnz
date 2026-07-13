@@ -1,0 +1,119 @@
+name: RNZ Monthly Zenodo Archive
+
+on:
+  schedule:
+    - cron: "41 3 1 * *"
+  workflow_dispatch:
+    inputs:
+      month:
+        description: UTC month in YYYY-MM format
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rnz-monthly-zenodo-archive
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: rnz-zero-cost-production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Enforce zero-cost publication policy
+        env:
+          REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+          RNZ_ARCHIVE_ENABLED: ${{ vars.RNZ_ARCHIVE_ENABLED || 'false' }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+          GH_ZERO_COST_REVIEWED_AT: ${{ vars.GH_ZERO_COST_REVIEWED_AT || '' }}
+          HF_ZERO_COST_REVIEWED_AT: ${{ vars.HF_ZERO_COST_REVIEWED_AT || '' }}
+        run: |
+          set -euo pipefail
+          test "$REPOSITORY_VISIBILITY" = "public"
+          test "$RNZ_ARCHIVE_ENABLED" = "true"
+          test "$HF_REPO_ID" = "edithatogo/digitalnz"
+          test -n "$GH_ZERO_COST_REVIEWED_AT"
+          test -n "$HF_ZERO_COST_REVIEWED_AT"
+          python scripts/rnz_archive.py policy
+
+      - name: Install archive clients only
+        run: python -m pip install "huggingface-hub==1.4.1" "requests==2.32.5"
+
+      - name: Download changed monthly shard
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+          INPUT_MONTH: ${{ inputs.month || '' }}
+        run: |
+          set -euo pipefail
+          month="${INPUT_MONTH:-$(date -u -d 'last month' +%Y-%m)}"
+          echo "MONTH=$month" >> "$GITHUB_ENV"
+          if hf download "$HF_REPO_ID" --repo-type dataset \
+            --include "rnz/zenodo/$month.json" --local-dir work/hf-receipt && \
+            test -s "work/hf-receipt/rnz/zenodo/$month.json"; then
+            echo "ALREADY_PUBLISHED=true" >> "$GITHUB_ENV"
+            echo "Zenodo receipt already exists for $month; publication is idempotently skipped." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "ALREADY_PUBLISHED=false" >> "$GITHUB_ENV"
+          hf download "$HF_REPO_ID" --repo-type dataset \
+            --include "rnz/releases/$month/*" --local-dir work/hf
+          test -s "work/hf/rnz/releases/$month/SHA256SUMS"
+
+      - name: Publish changed-content-only Zenodo version
+        if: env.ALREADY_PUBLISHED != 'true'
+        env:
+          ZENODO_TOKEN: ${{ secrets.ZENODO_TOKEN }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          import requests
+
+          root = Path("work/hf/rnz/releases") / os.environ["MONTH"]
+          files = [path for path in sorted(root.iterdir()) if path.is_file()]
+          total = sum(path.stat().st_size for path in files)
+          if not files or len(files) > 100 or total > 45_000_000_000:
+              raise SystemExit("monthly release exceeds zero-cost Zenodo limits")
+          token = os.environ["ZENODO_TOKEN"]
+          base = "https://zenodo.org/api"
+          metadata = json.loads(Path("digitalnz/.zenodo.json").read_text())
+          metadata["title"] = f"RNZ audio archive and machine transcripts: {os.environ['MONTH']}"
+          create = requests.post(f"{base}/deposit/depositions", params={"access_token": token}, json={"metadata": metadata}, timeout=60)
+          create.raise_for_status()
+          deposition = create.json()
+          bucket = deposition["links"]["bucket"]
+          for path in files:
+              with path.open("rb") as handle:
+                  response = requests.put(f"{bucket}/{path.name}", params={"access_token": token}, data=handle, timeout=900)
+              response.raise_for_status()
+          publish = requests.post(f"{base}/deposit/depositions/{deposition['id']}/actions/publish", params={"access_token": token}, timeout=60)
+          publish.raise_for_status()
+          receipt = {"deposition_id": deposition["id"], "doi": publish.json().get("doi"), "month": os.environ["MONTH"], "bytes": total}
+          Path("work/zenodo-receipt.json").write_text(json.dumps(receipt, indent=2))
+          print(json.dumps(receipt))
+          PY
+
+      - name: Persist Zenodo idempotency receipt
+        if: env.ALREADY_PUBLISHED != 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+        run: |
+          set -euo pipefail
+          hf upload "$HF_REPO_ID" work/zenodo-receipt.json "rnz/zenodo/$MONTH.json" \
+            --repo-type dataset --commit-message "docs(rnz): record Zenodo monthly publication"

@@ -1,0 +1,205 @@
+name: RNZ Continuous Audio Archive
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Processing mode
+        required: true
+        default: pilot
+        type: choice
+        options:
+          - pilot
+          - backfill
+      discover_limit:
+        description: Maximum records to discover
+        required: true
+        default: "100"
+        type: string
+      max_items:
+        description: Maximum recordings to process on this CPU run
+        required: true
+        default: "5"
+        type: string
+      record_query:
+        description: Optional DigitalNZ query or record selector
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rnz-continuous-audio-archive
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      enabled: ${{ steps.preflight.outputs.enabled }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Enforce public repository and zero-cost policy
+        id: preflight
+        env:
+          REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+          RNZ_ARCHIVE_ENABLED: ${{ vars.RNZ_ARCHIVE_ENABLED || 'false' }}
+          GH_ZERO_COST_REVIEWED_AT: ${{ vars.GH_ZERO_COST_REVIEWED_AT || '' }}
+          HF_ZERO_COST_REVIEWED_AT: ${{ vars.HF_ZERO_COST_REVIEWED_AT || '' }}
+        run: |
+          set -euo pipefail
+          test "$REPOSITORY_VISIBILITY" = "public"
+          test "$HF_REPO_ID" = "edithatogo/digitalnz"
+          python scripts/rnz_archive.py policy
+          if [ "$RNZ_ARCHIVE_ENABLED" = "true" ]; then
+            test -n "$GH_ZERO_COST_REVIEWED_AT"
+            test -n "$HF_ZERO_COST_REVIEWED_AT"
+            python - <<'PY'
+          import os
+          from datetime import date
+          for name in ("GH_ZERO_COST_REVIEWED_AT", "HF_ZERO_COST_REVIEWED_AT"):
+              age = (date.today() - date.fromisoformat(os.environ[name])).days
+              if age < 0 or age > 90:
+                  raise SystemExit(f"{name} must be reviewed within 90 days")
+          PY
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "RNZ_ARCHIVE_ENABLED is false; production processing remains safely suspended." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Validate offline RNZ tests
+        run: python -m unittest tests.test_rnz_archive
+
+  discover-process-publish:
+    needs: preflight
+    if: needs.preflight.outputs.enabled == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    environment: rnz-zero-cost-production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned CPU transcription dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          python -m pip install --requirement rnz/transcription-requirements.txt
+
+      - name: Restore append-only state from public Hugging Face dataset
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+        run: |
+          set -euo pipefail
+          mkdir -p work/state work/items work/release
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          repo = HfApi(token=os.environ["HF_TOKEN"]).repo_info(os.environ["HF_REPO_ID"], repo_type="dataset")
+          if repo.private or repo.id != "edithatogo/digitalnz":
+              raise SystemExit("Hugging Face archive must be the fixed public personal dataset")
+          PY
+          hf download "$HF_REPO_ID" --repo-type dataset --include "rnz/state/manifest.jsonl" --local-dir work/hf || true
+          if [ -f work/hf/rnz/state/manifest.jsonl ]; then
+            cp work/hf/rnz/state/manifest.jsonl work/state/manifest.jsonl
+          else
+            touch work/state/manifest.jsonl
+          fi
+
+      - name: Discover bounded RNZ batch
+        env:
+          DIGITALNZ_API_KEY: ${{ secrets.DIGITALNZ_API_KEY }}
+          DISCOVER_LIMIT: ${{ inputs.discover_limit || '100' }}
+          RECORD_QUERY: ${{ inputs.record_query || '' }}
+        run: |
+          set -euo pipefail
+          args=(--manifest work/state/manifest.jsonl --limit "$DISCOVER_LIMIT")
+          if [ -n "$RECORD_QUERY" ]; then args+=(--query "$RECORD_QUERY"); fi
+          python scripts/rnz_archive.py discover "${args[@]}"
+
+      - name: Process bounded CPU batch
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          MAX_ITEMS: ${{ inputs.max_items || '5' }}
+          PYANNOTE_METRICS_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          python scripts/rnz_archive.py process \
+            --manifest work/state/manifest.jsonl \
+            --output work/items \
+            --max-items "$MAX_ITEMS" \
+            --deadline-minutes 330
+
+      - name: Assemble reproducible monthly shard
+        run: |
+          set -euo pipefail
+          month="$(date -u +%Y-%m)"
+          python scripts/rnz_archive.py package \
+            --manifest work/state/manifest.jsonl \
+            --items work/items \
+            --output "work/release/$month"
+          mkdir -p work/publish/rnz/state work/publish/rnz/releases
+          cp work/state/manifest.jsonl work/publish/rnz/state/manifest.jsonl
+          cp -R "work/release/$month" "work/publish/rnz/releases/$month"
+
+      - name: Publish to the fixed public Hugging Face dataset
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+        run: |
+          set -euo pipefail
+          test "$HF_REPO_ID" = "edithatogo/digitalnz"
+          hf upload "$HF_REPO_ID" work/publish . --repo-type dataset \
+            --commit-message "data(rnz): archive bounded transcription batch"
+
+      - name: Report resumable state
+        if: always()
+        run: python scripts/rnz_archive.py summary --manifest work/state/manifest.jsonl
+
+  report-failure:
+    needs: [preflight, discover-process-publish]
+    if: always() && (needs.preflight.result == 'failure' || needs.discover-process-publish.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update zero-cost archive blocker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "RNZ archive paused: zero-cost or processing preflight failed"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          existing="$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')"
+          body="The continuous RNZ archive remains paused because a required zero-cost, account, rights, processing, or publication check failed. Review: $RUN_URL"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$TITLE" --body "$body" --label "archive"
+          fi

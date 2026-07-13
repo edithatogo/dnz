@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/edithatogo/dnz/rnz/manifest.schema.json",
+  "title": "RNZ archive manifest event",
+  "type": "object",
+  "required": ["event_id", "record_id", "event", "timestamp", "rights_basis"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 16},
+    "record_id": {"type": "string", "minLength": 1},
+    "event": {"enum": ["discovered", "downloaded", "processed", "archived", "rejected", "retry"]},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "rights_basis": {"type": "string", "minLength": 1},
+    "source_url": {"type": "string", "format": "uri"},
+    "media_url": {"type": "string", "format": "uri"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "content_type": {"type": "string"},
+    "size_bytes": {"type": "integer", "minimum": 0},
+    "duration_seconds": {"type": "number", "minimum": 0},
+    "retry_count": {"type": "integer", "minimum": 0},
+    "models": {"type": "object"},
+    "outputs": {"type": "object"},
+    "quality_flags": {"type": "array", "items": {"type": "string"}},
+    "reason": {"type": "string"}
+  },
+  "additionalProperties": true
+}
