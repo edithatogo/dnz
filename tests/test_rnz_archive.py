@@ -279,6 +279,11 @@ class RNZArchiveTests(unittest.TestCase):
         self.assertEqual(0.25, metrics["near_silence_ratio"])
         self.assertEqual(1, len(metrics["activity_segments"]))
         self.assertEqual("activity", metrics["activity_segments"][0]["label"])
+        self.assertEqual(64, len(metrics["activity_fingerprint"]))
+
+    def test_activity_similarity_is_candidate_only(self):
+        self.assertEqual(1.0, rnz_archive.activity_similarity("abcd", "abcd"))
+        self.assertLess(rnz_archive.activity_similarity("abcd", "wxyz"), 0.92)
 
     def test_enrichment_is_timestamped_reversible_and_review_only(self):
         segments = [

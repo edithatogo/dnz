@@ -3,6 +3,7 @@
 - [x] Implement parent/child recording discovery and archive manifest fields.
 - [~] Implement perceptual fingerprints and duplicate relationship classification.
   - [x] Add normalized-audio exact duplicate relationships.
+  - [x] Add deterministic activity fingerprints and review-only similarity candidates without automatic merge or removal.
   - [ ] Add evaluated CPU-bounded perceptual, excerpt and rebroadcast relationships that fit free runners; defer corpus-wide matching to optional local compute.
 - [~] Implement post-publication decodability, checksum and offset audits.
   - [x] Verify local derivatives, duration preservation, checksums and anonymous labels before packaging.

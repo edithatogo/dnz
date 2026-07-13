@@ -593,8 +593,21 @@ def audio_quality_metrics(audio: Path) -> dict[str, Any]:
         "clipped_sample_ratio": round(clipped / sample_count, 8) if sample_count else 0.0,
         "near_silence_ratio": round(silent / sample_count, 8) if sample_count else 1.0,
         "activity_segments": activity_segments,
+        "activity_fingerprint": activity_fingerprint(activity_segments),
         "method": "ffmpeg_s16le_mono_16khz_v1",
     }
+
+
+def activity_fingerprint(segments: list[dict[str, Any]]) -> str:
+    """Stable low-cost activity signature; it is a candidate signal, not identity."""
+    tokens = [f"{segment['label']}:{round(float(segment.get('rms_dbfs') or -99), 1)}" for segment in segments]
+    return hashlib.sha256("|".join(tokens).encode("utf-8")).hexdigest()
+
+
+def activity_similarity(left: str, right: str) -> float:
+    if not left or not right:
+        return 0.0
+    return round(sum(a == b for a, b in zip(left, right)) / max(len(left), len(right)), 6)
 
 
 def phonetic_key(value: str) -> str:
@@ -888,6 +901,7 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
         "rms_dbfs": audio_quality["rms_dbfs"],
         "clipped_sample_ratio": audio_quality["clipped_sample_ratio"],
         "activity_segment_count": len(audio_quality["activity_segments"]),
+        "activity_fingerprint": audio_quality["activity_fingerprint"],
     }
     return result
 
@@ -968,7 +982,13 @@ def process(args: argparse.Namespace) -> int:
             )
             provenance = {"record_id": record_id, "parent_record_id": item.get("parent_record_id"), "source_url": item["source_url"], "media_url": media_url, "sha256": sha256, "rights_basis": policy["rights_basis"], "models": policy["models"], "integrity": integrity, "duplicate_of": duplicate_of, "generated_at": utc_now()}
             (output_dir / "provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
-            append_event(args.manifest, {**item, "event": "processed", "media_url": media_url, "sha256": sha256, "normalized_sha256": integrity["normalized_sha256"], "duplicate_of": duplicate_of, "size_bytes": size, "duration_seconds": duration, "models": policy["models"], "outputs": result["outputs"], "quality_flags": result["quality_flags"], "pilot_metrics": result["pilot_metrics"], "review_required": result["review"]["required"], "review_reasons": result["review"]["reasons"]})
+            activity_candidates = []
+            for prior in latest_by_record(read_events(args.manifest)).values():
+                prior_metrics = prior.get("pilot_metrics") or {}
+                score = activity_similarity(result["pilot_metrics"]["activity_fingerprint"], prior_metrics.get("activity_fingerprint", ""))
+                if prior.get("event") == "processed" and prior.get("record_id") != record_id and score >= 0.92:
+                    activity_candidates.append({"record_id": prior["record_id"], "score": score, "relationship": "activity_similarity_candidate", "review_required": True})
+            append_event(args.manifest, {**item, "event": "processed", "media_url": media_url, "sha256": sha256, "normalized_sha256": integrity["normalized_sha256"], "duplicate_of": duplicate_of, "activity_relationship_candidates": activity_candidates, "size_bytes": size, "duration_seconds": duration, "models": policy["models"], "outputs": result["outputs"], "quality_flags": result["quality_flags"], "pilot_metrics": result["pilot_metrics"], "review_required": result["review"]["required"] or bool(activity_candidates), "review_reasons": result["review"]["reasons"] + (["activity_similarity_candidate"] if activity_candidates else [])})
         except Exception as exc:
             source_path.unlink(missing_ok=True)
             count = int(item.get("retry_count", 0)) + 1
