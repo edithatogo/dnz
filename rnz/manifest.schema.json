@@ -11,6 +11,8 @@
     "timestamp": {"type": "string", "format": "date-time"},
     "rights_basis": {"type": "string", "minLength": 1},
     "source_url": {"type": "string", "format": "uri"},
+    "digitalnz_metadata": {"type": "object"},
+    "metadata_retrieved_at": {"type": "string", "format": "date-time"},
     "parent_record_id": {"type": ["string", "null"]},
     "rnz_media_id": {"type": "string"},
     "child_count": {"type": "integer", "minimum": 1},

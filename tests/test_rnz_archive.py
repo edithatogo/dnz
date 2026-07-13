@@ -86,6 +86,7 @@ class RNZArchiveTests(unittest.TestCase):
                 rnz_archive.discover(args)
             event = rnz_archive.read_events(manifest)[0]
             self.assertEqual("41680626", event["record_id"])
+            self.assertEqual(response["record"], event["digitalnz_metadata"])
 
     def test_audio_extraction_requires_matching_rnz_id(self):
         body = """

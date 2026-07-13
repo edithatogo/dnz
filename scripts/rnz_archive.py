@@ -271,6 +271,8 @@ def discover(args: argparse.Namespace) -> int:
                     "source_url": source_url,
                     "collection": collection,
                     "title": record.get("title"),
+                    "digitalnz_metadata": record,
+                    "metadata_retrieved_at": utc_now(),
                     "retry_count": 0,
                 },
             )
@@ -296,7 +298,13 @@ def discover(args: argparse.Namespace) -> int:
             record_id = str(record.get("id", "")).strip()
             if not record_id or record_id in existing:
                 continue
-            candidates = media_candidates(record)
+            detail_payload = fetch_json(
+                f"https://api.digitalnz.org/v3/records/{record_id}.json",
+                {},
+                headers=headers,
+            )
+            detail = detail_payload.get("record", record)
+            candidates = media_candidates(detail)
             source_url = next((url for url in candidates if host_allowed(url, policy["allowed_media_domains"])), None)
             if not source_url:
                 continue
@@ -308,10 +316,13 @@ def discover(args: argparse.Namespace) -> int:
                     "rights_basis": policy["rights_basis"],
                     "source_url": source_url,
                     "collection": collection,
-                    "title": record.get("title"),
+                    "title": detail.get("title"),
+                    "digitalnz_metadata": detail,
+                    "metadata_retrieved_at": utc_now(),
                     "retry_count": 0,
                 },
             )
+            time.sleep(0.2)
             remaining -= 1
             if remaining <= 0:
                 break

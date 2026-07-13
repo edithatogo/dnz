@@ -182,6 +182,25 @@ jobs:
           hf upload "$HF_REPO_ID" work/publish . --repo-type dataset \
             --commit-message "data(rnz): archive bounded transcription batch"
 
+      - name: Verify published shard round trip
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ vars.HF_REPO_ID || 'edithatogo/digitalnz' }}
+        run: |
+          set -euo pipefail
+          month="$(date -u +%Y-%m)"
+          shard_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          release_path="rnz/releases/$month"
+          rm -rf work/roundtrip
+          hf download "$HF_REPO_ID" --repo-type dataset \
+            --include "$release_path/*-$shard_id*" \
+            --local-dir work/roundtrip
+          cd "work/roundtrip/$release_path"
+          test -s "audio-$shard_id.tar"
+          test -s "manifest-$shard_id.parquet"
+          test -s "manifest-$shard_id.jsonl"
+          sha256sum --check "SHA256SUMS-$shard_id"
+
       - name: Report resumable state
         if: always()
         run: python scripts/rnz_archive.py summary --manifest work/state/manifest.jsonl

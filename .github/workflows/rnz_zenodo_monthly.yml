@@ -80,9 +80,16 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os
+          import hashlib, json, os
           from pathlib import Path
           import requests
+
+          def md5_file(path):
+              digest = hashlib.md5(usedforsecurity=False)
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
 
           root = Path("work/hf/rnz/releases") / os.environ["MONTH"]
           files = [path for path in sorted(root.iterdir()) if path.is_file()]
@@ -103,7 +110,26 @@ jobs:
               response.raise_for_status()
           publish = requests.post(f"{base}/deposit/depositions/{deposition['id']}/actions/publish", params={"access_token": token}, timeout=60)
           publish.raise_for_status()
-          receipt = {"deposition_id": deposition["id"], "doi": publish.json().get("doi"), "month": os.environ["MONTH"], "bytes": total}
+          published = requests.get(
+              f"{base}/deposit/depositions/{deposition['id']}",
+              params={"access_token": token},
+              timeout=60,
+          )
+          published.raise_for_status()
+          remote_files = {item["filename"]: item for item in published.json().get("files", [])}
+          verified = {}
+          for path in files:
+              remote = remote_files.get(path.name)
+              local_md5 = md5_file(path)
+              if not remote or remote.get("checksum") != f"md5:{local_md5}":
+                  raise SystemExit(f"Zenodo checksum verification failed for {path.name}")
+              verified[path.name] = remote["checksum"]
+              if path.name.startswith("SHA256SUMS-"):
+                  download = requests.get(remote["links"]["download"], timeout=120)
+                  download.raise_for_status()
+                  if download.content != path.read_bytes():
+                      raise SystemExit(f"Zenodo checksum manifest round trip failed for {path.name}")
+          receipt = {"deposition_id": deposition["id"], "doi": publish.json().get("doi"), "month": os.environ["MONTH"], "bytes": total, "verified_files": verified}
           Path("work/zenodo-receipt.json").write_text(json.dumps(receipt, indent=2))
           print(json.dumps(receipt))
           PY
