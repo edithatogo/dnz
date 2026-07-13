@@ -13,6 +13,10 @@ SPEC = importlib.util.spec_from_file_location("rnz_archive", ROOT / "scripts" / 
 rnz_archive = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader
 SPEC.loader.exec_module(rnz_archive)
+EVAL_SPEC = importlib.util.spec_from_file_location("rnz_evaluate", ROOT / "scripts" / "rnz_evaluate.py")
+rnz_evaluate = importlib.util.module_from_spec(EVAL_SPEC)
+assert EVAL_SPEC.loader
+EVAL_SPEC.loader.exec_module(rnz_evaluate)
 
 
 class RNZArchiveTests(unittest.TestCase):
@@ -359,6 +363,14 @@ class RNZArchiveTests(unittest.TestCase):
             self.assertEqual(100, report["target_count"])
             self.assertEqual(1998, report["records"][0]["year"])
             self.assertEqual(2, report["records"][0]["speaker_count"])
+
+    def test_evaluation_report_blocks_unreviewed_pilot(self):
+        fixture = json.loads((ROOT / "rnz" / "evaluation-fixtures.json").read_text(encoding="utf-8"))
+        report = rnz_evaluate.evaluate(fixture, {"processed_count": 1, "target_count": 100})
+        self.assertTrue(report["promotion"]["blocked"])
+        self.assertEqual(0.01, report["pilot"]["coverage_ratio"])
+        self.assertEqual(0.0, report["fixture"]["transcripts"][0]["transcript"]["word_error_rate"])
+        self.assertEqual(0.666667, report["fixture"]["boundaries"][0]["f1"])
 
     def test_analysis_schema_requires_every_generated_field(self):
         schema = json.loads((ROOT / "rnz" / "analysis.schema.json").read_text(encoding="utf-8"))

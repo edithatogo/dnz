@@ -41,6 +41,8 @@ Pilot discovery divides its requested record count as evenly as possible across 
 
 Each state publication refreshes `rnz/state/pilot-report.json` in the public Hugging Face dataset. The report records progress toward the 100-item target and exposes the review strata without requiring operators to parse the append-only event stream.
 
+The same state publication refreshes `rnz/state/evaluation-report.json`. It contains offline transcript and boundary fixture scores plus pilot coverage and remains promotion-blocked until the target is processed and manually reviewed. Māori and multilingual promotion is governed by `rnz/maori-governance.md`.
+
 Repository operators can use the manual `RNZ Archive Review Disposition` workflow to append `approved`, `needs_correction`, `rights_review`, or `no_action` events to `rnz/state/reviews.jsonl`. Each event records the authenticated GitHub actor and run ID. The ledger is append-only and intentionally has no automatic content action; correction, rights, or publication decisions require a separate reviewed change.
 
 ## Follow-on enrichment

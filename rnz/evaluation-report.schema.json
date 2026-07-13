@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/edithatogo/dnz/rnz/evaluation-report.schema.json",
+  "title": "RNZ offline evaluation report",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "fixture", "pilot", "promotion", "limitations"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "fixture": {"type": "object"},
+    "pilot": {"type": "object"},
+    "promotion": {"type": "object"},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

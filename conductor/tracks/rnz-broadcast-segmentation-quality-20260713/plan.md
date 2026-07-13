@@ -1,6 +1,6 @@
 # Track Plan: RNZ Broadcast Segmentation & Quality
 
-- [ ] Select and pin CPU acoustic segmentation components and evaluation fixtures that complete within the standard free-runner budget.
+- [x] Select deterministic CPU activity segmentation and pin offline evaluation fixtures within the standard free-runner budget.
 - [~] Implement audio-quality, speech/music and acoustic-event derivatives.
   - [x] Add speech coverage, confidence, repetition, overlap and possible non-speech review metrics.
   - [x] Add streaming deterministic RMS, clipping and near-silence metrics using FFmpeg PCM.

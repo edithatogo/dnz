@@ -182,12 +182,19 @@ jobs:
           python scripts/rnz_archive.py pilot-report \
             --manifest work/state/manifest.jsonl \
             --output work/state/pilot-report.json
+          python scripts/rnz_evaluate.py \
+            --fixture rnz/evaluation-fixtures.json \
+            --pilot work/state/pilot-report.json \
+            --output work/state/evaluation-report.json
           hf upload "$HF_REPO_ID" work/state/manifest.jsonl rnz/state/manifest.jsonl \
             --repo-type dataset \
             --commit-message "data(rnz): persist resumable archive state"
           hf upload "$HF_REPO_ID" work/state/pilot-report.json rnz/state/pilot-report.json \
             --repo-type dataset \
             --commit-message "data(rnz): update pilot review matrix"
+          hf upload "$HF_REPO_ID" work/state/evaluation-report.json rnz/state/evaluation-report.json \
+            --repo-type dataset \
+            --commit-message "data(rnz): publish bounded evaluation report"
 
       - name: Assemble reproducible monthly shard
         if: steps.process.outputs.has_items == 'true'

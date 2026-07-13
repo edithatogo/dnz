@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "transcripts": [
+    {"id": "synthetic-clear", "reference": "Kia ora from Wellington", "predicted": "Kia ora from Wellington"},
+    {"id": "synthetic-noisy", "reference": "The caller discussed housing", "predicted": "The caller discussed housing policy"}
+  ],
+  "boundaries": [
+    {"id": "synthetic-chapters", "reference": [0, 30, 60], "predicted": [0, 31, 75], "tolerance_seconds": 2}
+  ]
+}
