@@ -129,6 +129,26 @@ def latest_by_record(events: Iterable[dict[str, Any]]) -> dict[str, dict[str, An
     return latest
 
 
+def balanced_quotas(total: int, labels: list[str]) -> dict[str, int]:
+    if total < 0:
+        raise ValueError("quota total cannot be negative")
+    if not labels:
+        return {}
+    base, extra = divmod(total, len(labels))
+    return {label: base + (1 if index < extra else 0) for index, label in enumerate(labels)}
+
+
+def metadata_year(record: dict[str, Any]) -> int | None:
+    for name in ("date", "display_date", "created", "syndication_date"):
+        value = record.get(name)
+        values = value if isinstance(value, list) else [value]
+        for candidate in values:
+            match = re.search(r"\b(18|19|20)\d{2}\b", str(candidate or ""))
+            if match:
+                return int(match.group(0))
+    return None
+
+
 def validate_zero_cost(workflows: Path, expected_hf_repo: str) -> list[str]:
     errors: list[str] = []
     for path in sorted(workflows.glob("*.y*ml")):
@@ -312,14 +332,18 @@ def discover(args: argparse.Namespace) -> int:
                 },
             )
         return 0
+    quotas = balanced_quotas(args.limit, collections)
     for collection in collections:
         if remaining <= 0:
             break
+        collection_limit = min(remaining, quotas[collection])
+        if collection_limit <= 0:
+            continue
         params: dict[str, Any] = {
             "text": args.query or "*",
             "and[primary_collection][]": collection,
             "and[category][]": "Audio",
-            "per_page": min(100, remaining),
+            "per_page": min(100, collection_limit),
             "page": 1,
         }
         headers = {"Authentication-Token": api_key} if api_key else None
@@ -354,12 +378,17 @@ def discover(args: argparse.Namespace) -> int:
                     "title": detail.get("title"),
                     "digitalnz_metadata": detail,
                     "metadata_retrieved_at": utc_now(),
+                    "pilot_stratum": {
+                        "collection": collection,
+                        "year": metadata_year(detail),
+                    },
                     "retry_count": 0,
                 },
             )
             time.sleep(0.2)
             remaining -= 1
-            if remaining <= 0:
+            collection_limit -= 1
+            if remaining <= 0 or collection_limit <= 0:
                 break
     return 0
 

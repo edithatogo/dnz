@@ -37,6 +37,8 @@ The analysis fields are search and review aids. They are not editorial classific
 
 Compound RNZ landing pages are expanded into a DigitalNZ parent and stable `digitalnz--rnz-media` child records. One child is processed within the current bound and the remaining children stay queued. The complete item-level DigitalNZ metadata response and retrieval time are retained in the append-only manifest. Before packaging, the pipeline verifies every required derivative is non-empty, normalized duration matches the source, speaker labels remain anonymous, and the normalized-audio checksum can identify exact duplicates. After Hugging Face upload, the workflow downloads the new shard and verifies its checksum manifest. Quality and sensitive-content matches create versioned `review.json` queue records and workflow counts; they never restrict or remove an item automatically.
 
+Pilot discovery divides its requested record count as evenly as possible across every approved RNZ collection and stores collection and source-year strata. Post-processing review can additionally stratify by measured duration, language signals, speaker count, overlap, confidence and audio-quality flags.
+
 Repository operators can use the manual `RNZ Archive Review Disposition` workflow to append `approved`, `needs_correction`, `rights_review`, or `no_action` events to `rnz/state/reviews.jsonl`. Each event records the authenticated GitHub actor and run ID. The ledger is append-only and intentionally has no automatic content action; correction, rights, or publication decisions require a separate reviewed change.
 
 ## Follow-on enrichment

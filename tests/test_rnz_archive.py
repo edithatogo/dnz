@@ -16,6 +16,16 @@ SPEC.loader.exec_module(rnz_archive)
 
 
 class RNZArchiveTests(unittest.TestCase):
+    def test_balanced_collection_quotas_cover_all_sources(self):
+        quotas = rnz_archive.balanced_quotas(100, ["a", "b", "c", "d", "e", "f"])
+        self.assertEqual(100, sum(quotas.values()))
+        self.assertLessEqual(max(quotas.values()) - min(quotas.values()), 1)
+        self.assertTrue(all(value > 0 for value in quotas.values()))
+
+    def test_metadata_year_uses_first_parseable_source_date(self):
+        self.assertEqual(1987, rnz_archive.metadata_year({"date": ["unknown", "12 May 1987"]}))
+        self.assertIsNone(rnz_archive.metadata_year({"date": "undated"}))
+
     def test_archive_policy_has_fail_closed_zero_cost_contract(self):
         policy = json.loads((ROOT / "rnz" / "archive-policy.json").read_text(encoding="utf-8"))
         self.assertEqual([], rnz_archive.validate_cost_contract(policy))
