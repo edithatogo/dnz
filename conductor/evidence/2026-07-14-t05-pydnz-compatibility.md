@@ -18,3 +18,7 @@ rustup run stable-x86_64-pc-windows-gnu cargo check -p dnz-python --all-features
 Pass: native extension check completed without diagnostics and Python facade compilation, unit, and smoke checks passed.
 
 Remaining T05 work: broaden behavioral tests for all documented filter and pagination combinations and produce a wheel-level import test.
+
+External validation blocker: `pixi run dry-run-maturin` resolves the repository
+packaging task but fails because `maturin` is not installed in the configured
+Pixi environment (`maturin: command not found`).
