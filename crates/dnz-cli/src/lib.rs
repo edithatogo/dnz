@@ -88,6 +88,42 @@ pub enum Commands {
         format: Format,
     },
 
+    /// Fetch metadata for one DigitalNZ record.
+    Record {
+        /// DigitalNZ record identifier.
+        id: String,
+
+        /// Comma-separated fields to request.
+        #[arg(long, value_delimiter = ',')]
+        fields: Vec<String>,
+
+        /// Output format.
+        #[arg(short, long, value_enum, default_value_t = Format::Json)]
+        format: Format,
+    },
+
+    /// Fetch records related to one DigitalNZ record.
+    MoreLikeThis {
+        /// DigitalNZ record identifier.
+        id: String,
+
+        /// Result page index.
+        #[arg(short, long, default_value_t = 1)]
+        page: u32,
+
+        /// Count of records per page.
+        #[arg(short, long, default_value_t = 20)]
+        limit: u32,
+
+        /// Comma-separated fields to request.
+        #[arg(long, value_delimiter = ',')]
+        fields: Vec<String>,
+
+        /// Output format.
+        #[arg(short, long, value_enum, default_value_t = Format::Json)]
+        format: Format,
+    },
+
     /// Export New Zealand Gazette records as raw pages, JSONL records, and a manifest.
     GazetteExport {
         /// Output directory for records.jsonl, manifest.json, and raw pages.
