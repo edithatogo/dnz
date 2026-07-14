@@ -1,110 +1,20 @@
-# Project Tracks
+# Conductor track index
 
----
-## [x] Track 1: Scaffold CLI & MCP Skeleton
-- Folder: [scaffold-cli-mcp-skeleton](./tracks/scaffold-cli-mcp-skeleton)
+This file is a compatibility index only. It is not a second roadmap or status
+registry.
 
----
-## [x] Track 2: Core API Client
-- Folder: [core-api-client](./tracks/core-api-client)
+- Track definitions, priorities, dependencies, and acceptance criteria: [`manifest.yaml`](./manifest.yaml)
+- Track status, active work, blockers, evidence, and handoff: [`state.yaml`](./state.yaml)
+- Detailed track notes: [`tracks/`](./tracks/)
+- GitHub issue mirror: [edithatogo/dnz issues](https://github.com/edithatogo/dnz/issues)
 
----
-## [x] Track 3: CLI Implementation
-- Folder: [cli-implementation](./tracks/cli-implementation)
+## Canonical operating rule
 
----
-## [x] Track 4: MCP Server Features
-- Folder: [mcp-server-features](./tracks/mcp-server-features)
+Read `manifest.yaml` for what a track means and `state.yaml` for what is true
+about its current status. Update both when scope or verification changes.
+Individual `tracks/T*.md` files contain track-specific notes and evidence
+links; their `Status` lines are informational and must agree with `state.yaml`.
 
----
-## [x] Track 5: Robustness & Advanced Testing
-- Folder: [robustness-and-advanced-testing](./tracks/robustness-and-advanced-testing)
-
----
-## [x] Track 6: Performance Profiling & Hardening
-- Folder: [performance-profiling-and-hardening](./tracks/performance-profiling-and-hardening)
-
----
-## [x] Track 7: Packaging & Registry Submission
-- Folder: [packaging-and-registry-submission](./tracks/packaging-and-registry-submission)
-
----
-## [x] Track 8: Semantic Vector Search
-- Folder: [semantic-vector-search](./tracks/semantic-vector-search)
-
----
-## [x] Track 9: RAG Context Digests
-- Folder: [rag-context-digests](./tracks/rag-context-digests)
-
----
-## [x] Track 10: Agentic Query Autopilot
-- Folder: [agentic-query-autopilot](./tracks/agentic-query-autopilot)
-
----
-## [x] Track 11: Python FFI Bindings
-- Folder: [python-ffi-bindings](./tracks/python-ffi-bindings)
-
----
-## [x] Track 12: Open Science Export
-- Folder: [open-science-export](./tracks/open-science-export)
-
----
-## [x] Track 13: Hardening, Coverage & Registry Submission
-- Folder: [hardening-coverage-registry-submission](./tracks/hardening-coverage-registry-submission)
-- Status: All 4 tasks complete. Task 13.1 ✅ (secrets mapping in release.yml). Task 13.2 ✅ (comprehensive tests added across all modules; formal 90% coverage gate is CI-verified). Task 13.3 ✅ (vector search hot-path optimized with partial sort). Task 13.4 ✅ (dry-run publish scripts for Cargo, Python wheel/twine, and maturin). Coverage tooling uses `cargo-llvm-cov`. Python packaging verified via `scripts/verify-python-wheel.ps1`.
-
----
-## [x] Track 14: Workspace Diagnostics, Audits & Pre-commit Hooks
-- Folder: [workspace-diagnostics-audits-pre-commit](./tracks/workspace-diagnostics-audits-pre-commit)
-
-
----
-## [x] Track 15: Power BI Semantic Model Integration
-- Folder: [power-bi-semantic-model-integration](./tracks/power-bi-semantic-model-integration)
-
----
-## [x] Track 16: Semantic Docs & Conda-forge Packaging
-- Folder: [semantic-model-docs-conda-packaging](./tracks/semantic-model-docs-conda-packaging)
-
----
-## [x] Track 17: Open Social Data Provider Contract
-- Folder: [open-social-data-provider-contract-20260705](./tracks/open-social-data-provider-contract-20260705)
-- Status: Complete. Defines the `dnz`-side compatibility contract for downstream `open_social_data` DigitalNZ provider work while keeping the standalone CLI, MCP server, cache, and package surfaces independent.
-
----
-## [x] Track 18: API Docs & Collection Map
-- Folder: [api-docs-collection-map-20260707](./tracks/api-docs-collection-map-20260707)
-
----
----
-
-## [~] Track 22: Zero-Cost Continuous RNZ Audio Archive
-- Folder: [rnz-continuous-audio-archive-20260713](./tracks/rnz-continuous-audio-archive-20260713)
-
----
-
-## [ ] Track 23: RNZ Broadcast Segmentation & Quality
-- Folder: [rnz-broadcast-segmentation-quality-20260713](./tracks/rnz-broadcast-segmentation-quality-20260713)
-
----
-
-## [ ] Track 24: RNZ Māori & Multilingual Enrichment
-- Folder: [rnz-maori-multilingual-enrichment-20260713](./tracks/rnz-maori-multilingual-enrichment-20260713)
-
----
-
-## [ ] Track 25: RNZ Entity, Topic & Search Enrichment
-- Folder: [rnz-entity-topic-search-enrichment-20260713](./tracks/rnz-entity-topic-search-enrichment-20260713)
-
----
-
-## [ ] Track 26: RNZ Preservation Integrity & Sensitive-Content Safety
-- Folder: [rnz-preservation-integrity-safety-20260713](./tracks/rnz-preservation-integrity-safety-20260713)
-
----
-
-## [!] Track 27: Optional Local RNZ Compute
-- Folder: [rnz-optional-local-compute-20260713](./tracks/rnz-optional-local-compute-20260713)
-- Status: Blocked until Tracks 22 through 26 are complete, reviewed and archived. Manual user-owned hardware only; zero external spend.
-
----
+The older Track 1–27 roadmap is retained in Git history and any detailed track
+folders remain available, but it is no longer authoritative for the T00–T10
+modernisation sequence.

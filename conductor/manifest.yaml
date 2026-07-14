@@ -1,0 +1,154 @@
+schema_version: 2
+name: dnz-modernisation
+repository: edithatogo/dnz
+mission: >-
+  Deliver a secure, strongly typed, clean-room-compatible DigitalNZ v3 platform
+  across Rust, CLI, Python, MCP, harvesting, exports, analytics, and research workflows.
+
+principles:
+  - core_first
+  - preserve_raw_metadata
+  - backwards_compatible_by_default
+  - optional_public_auth
+  - secrets_never_persisted_or_logged
+  - offline_deterministic_tests
+  - evidence_before_completion
+  - heavy_features_opt_in
+  - one_writer_for_shared_code
+
+quality_gates:
+  rust_format: cargo fmt --all -- --check
+  rust_lint: cargo clippy --workspace --all-targets --all-features -- -D warnings
+  rust_test: cargo test --workspace --all-features
+  repository_tasks:
+    - pixi run build
+    - pixi run test
+    - pixi run clippy
+  conditional:
+    - python and maturin checks when Python changes
+    - MCP protocol/schema checks when MCP changes
+    - docs build and link checks when docs change
+    - package/release smoke tests when packaging changes
+
+tracks:
+  - id: T00
+    title: Bootstrap, baseline, and contract evidence
+    priority: P0
+    depends_on: []
+    acceptance:
+      - conductor and AGENTS instructions are reconciled with existing files
+      - baseline branch, commit, status, submodules, licenses, and checks are recorded
+      - official API evidence or an explicit offline limitation is recorded
+      - no bootstrap archive or staging directory is committed
+
+  - id: T01
+    title: Transport, auth, secrets, cache isolation, and structured errors
+    priority: P0
+    depends_on: [T00]
+    acceptance:
+      - compatibility-preserving unauthenticated and authenticated client construction
+      - Authentication-Token header is the default token transport
+      - legacy query-key mode is explicit and tested
+      - secrets are redacted everywhere
+      - auth/cache namespaces cannot cross-contaminate responses
+      - timeouts, Retry-After, bounded retries, and structured API errors are tested
+
+  - id: T02
+    title: Search query completeness and serialization correctness
+    priority: P0
+    depends_on: [T01]
+    acceptance:
+      - per_page supports 0 through 100 exactly
+      - current facet limits and exclude_filters_from_facets are supported
+      - complete AND, OR, WITHOUT, nested boolean, typed filter, and bbox coverage
+      - safe extra_params exists without raw URL injection or auth override
+      - table/property tests cover encoding, repeats, Unicode, and invalid values
+
+  - id: T03
+    title: Endpoint coverage, models, and response normalization
+    priority: P0
+    depends_on: [T01]
+    acceptance:
+      - search, record metadata, and More Like This core builders exist
+      - flat and verified legacy response shapes normalize without data loss
+      - RecordId tolerates verified integer/string forms
+      - common fields are typed and unknown fields remain accessible
+      - JSON stable; XML/RSS labels match verified support
+      - 400, 403, 404, 429, 5xx, decode, timeout, and network errors are tested
+
+  - id: T04
+    title: CLI, Python, MCP, and documentation parity
+    priority: P0
+    depends_on: [T02, T03]
+    acceptance:
+      - adapters delegate query/request behavior to core
+      - CLI exposes fields, filters, record, MLT, output and auth/config behavior
+      - Python supports ergonomic sync, optional async, chaining, raw and typed results
+      - MCP schemas and structured results cover implemented core and preserve stdout
+      - public docs/examples and migration notes are current
+
+  - id: T05
+    title: Clean-room pydnz compatibility
+    priority: P0
+    depends_on: [T04]
+    acceptance:
+      - from dnz.api import Dnz works in supported Python versions
+      - public pydnz search behaviours are independently reimplemented and tested
+      - Results facade exposes result_count, records, facets, errors, request, raw
+      - unsafe wild injection is replaced by documented safe extra_params
+      - GPL code is not copied or packaged
+
+  - id: T06
+    title: Existing correctness-debt remediation
+    priority: P0
+    depends_on: [T03]
+    acceptance:
+      - dedupe is ID-safe and does not drop empty-title records
+      - RAG XML is escaped and timeline dates are parsed safely
+      - citation claims, JSON-LD license/coverage, Frictionless files, and Gazette manifests are truthful
+      - cosine range, vector dimensions/upserts, and model-download security are corrected
+      - Python runtime lifecycle is safe and efficient
+      - dense harvest partitions no longer truncate at 1000
+
+  - id: T07
+    title: Streaming, cache lifecycle, harvest, and incremental sync
+    priority: P1
+    depends_on: [T02, T03, T06]
+    acceptance:
+      - lazy page/record streams support limits, backpressure, cancellation
+      - cache has migrations, TTL/offline behavior, limits, and provenance
+      - harvest planner recursively partitions, checkpoints, resumes, and rate-limits
+      - incremental sync and manifests are deterministic and candid about limitations
+
+  - id: T08
+    title: Exports, provenance, geospatial, data quality, and rights
+    priority: P1
+    depends_on: [T03, T07]
+    acceptance:
+      - streaming JSONL, CSV, Parquet/Arrow and selected database exports
+      - valid GeoJSON/GeoParquet for verified coordinates
+      - deterministic atomic output, checksums, schema versions, and provenance
+      - data-quality and rights/reuse audits with no legal overclaim
+      - Frictionless, schema.org, and RO-Crate metadata are source-grounded
+
+  - id: T09
+    title: Evidence packs, citations, lexical/vector/hybrid research workflows
+    priority: P2
+    depends_on: [T08]
+    acceptance:
+      - provenance-rich JSON/Markdown evidence packs
+      - CSL-compatible citation data or accurately labelled generic references
+      - optional lexical/vector/hybrid indexes with model/index provenance
+      - API MLT and local similarity remain distinguishable and explainable
+
+  - id: T10
+    title: CI, security, packaging, release, and performance
+    priority: P1
+    depends_on: [T05, T06]
+    acceptance:
+      - OpenAPI drift reporting and opt-in live smoke tests
+      - format/lint/test/Python/MCP/docs/package CI
+      - audit, deny/license, secret, SBOM, checksum/provenance controls
+      - crates, CLI binaries, PyPI wheels, Pixi/Conda and optional image are smoke-tested
+      - release archives exclude incompatible/unwanted submodules
+      - documented MSRV, semver/deprecation policy, benchmarks and release checklist
