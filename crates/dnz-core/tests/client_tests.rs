@@ -1,7 +1,7 @@
 //! Core client integration tests using wiremock
 
 use dnz_core::{Client, DnzError};
-use wiremock::matchers::{header, method, query_param};
+use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
@@ -124,6 +124,70 @@ async fn test_mock_search_fields_and_excludes() {
 
     assert_eq!(response.search.results[0].id, "789");
     assert_eq!(response.search.results[0].title, "Short Item");
+}
+
+#[tokio::test]
+async fn test_record_metadata_normalizes_integer_id_and_unknown_fields() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/records/37757055.json"))
+        .and(header("Authentication-Token", "test_key"))
+        .and(query_param("fields", "title,source_url"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "search": {
+                "result_count": 1,
+                "results": [{
+                    "id": 37757055,
+                    "title": "Kauri tree photo",
+                    "source_url": "https://example.test/source",
+                    "provider_extension": {"preserved": true}
+                }]
+            }
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let record = Client::new("test_key")
+        .with_base_url(mock_server.uri())
+        .record("37757055")
+        .fields(vec!["title".to_string(), "source_url".to_string()])
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(record.id, "37757055");
+    assert_eq!(record.title, "Kauri tree photo");
+    assert_eq!(record.extra_fields["provider_extension"]["preserved"], true);
+}
+
+#[tokio::test]
+async fn test_more_like_this_builds_endpoint_and_normalizes_flat_results() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/records/12/more_like_this.json"))
+        .and(header("Authentication-Token", "test_key"))
+        .and(query_param("page", "2"))
+        .and(query_param("per_page", "5"))
+        .and(query_param("fields", "title,subject"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "result_count": 1,
+            "records": [{"id": 99, "title": "Similar item"}]
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let response = Client::new("test_key")
+        .with_base_url(mock_server.uri())
+        .more_like_this("12")
+        .page(2)
+        .per_page(5)
+        .fields(vec!["title".to_string(), "subject".to_string()])
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.search.result_count, 1);
+    assert_eq!(response.search.results[0].id, "99");
 }
 
 #[tokio::test]

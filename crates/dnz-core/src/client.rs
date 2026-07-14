@@ -2,7 +2,7 @@
 
 use crate::cache::PersistentCache;
 use crate::errors::DnzError;
-use crate::models::SearchResponse;
+use crate::models::{normalize_record_response, normalize_search_response, Record, SearchResponse};
 use reqwest::Client as HttpClient;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -101,6 +101,150 @@ impl Client {
     /// Create a search query builder.
     pub fn search(&self, text: impl Into<String>) -> QueryBuilder {
         QueryBuilder::new(self.clone(), text.into())
+    }
+
+    /// Create a record-by-ID metadata builder.
+    pub fn record(&self, record_id: impl Into<String>) -> RecordQueryBuilder {
+        RecordQueryBuilder {
+            client: self.clone(),
+            record_id: record_id.into(),
+            fields: Vec::new(),
+        }
+    }
+
+    /// Create a More Like This builder for a record ID.
+    pub fn more_like_this(&self, record_id: impl Into<String>) -> MoreLikeThisQueryBuilder {
+        MoreLikeThisQueryBuilder {
+            client: self.clone(),
+            record_id: record_id.into(),
+            page: 1,
+            per_page: 20,
+            fields: Vec::new(),
+            filters: Vec::new(),
+        }
+    }
+}
+
+/// Builder for the DigitalNZ v3 get-metadata endpoint.
+#[derive(Debug, Clone)]
+pub struct RecordQueryBuilder {
+    client: Client,
+    record_id: String,
+    fields: Vec<String>,
+}
+
+impl RecordQueryBuilder {
+    /// Restrict the metadata fields returned by the provider.
+    pub fn fields(mut self, fields: Vec<String>) -> Self {
+        self.fields = fields;
+        self
+    }
+
+    /// Fetch and normalize one record from a verified response shape.
+    pub async fn send(self) -> anyhow::Result<Record> {
+        let endpoint = record_endpoint_url(&self.client.base_url, &self.record_id)?;
+        let mut params = Vec::new();
+        if !self.fields.is_empty() {
+            params.push(("fields", self.fields.join(",")));
+        }
+
+        let mut request = self.client.http_client.get(endpoint).query(&params);
+        if !self.client.api_key.is_empty() && !self.client.legacy_query_key_auth {
+            request = request.header("Authentication-Token", &self.client.api_key);
+        }
+
+        let response = request
+            .send()
+            .await
+            .map_err(|_| anyhow::Error::new(DnzError::Transport))?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(anyhow::Error::new(DnzError::HttpStatus {
+                status: status.as_u16(),
+                retry_after: retry_after_delay(response.headers()),
+            }));
+        }
+
+        let payload = response
+            .json::<serde_json::Value>()
+            .await
+            .map_err(|err| anyhow::Error::new(DnzError::Decode).context(err))?;
+        normalize_record_response(payload)
+    }
+}
+
+/// Builder for the documented More Like This endpoint.
+#[derive(Debug, Clone)]
+pub struct MoreLikeThisQueryBuilder {
+    client: Client,
+    record_id: String,
+    page: u32,
+    per_page: u32,
+    fields: Vec<String>,
+    filters: Vec<FilterExpr>,
+}
+
+impl MoreLikeThisQueryBuilder {
+    pub fn page(mut self, page: u32) -> Self {
+        self.page = page.max(1);
+        self
+    }
+
+    pub fn per_page(mut self, per_page: u32) -> Self {
+        self.per_page = per_page.min(100);
+        self
+    }
+
+    pub fn fields(mut self, fields: Vec<String>) -> Self {
+        self.fields = fields;
+        self
+    }
+
+    pub fn try_filter(mut self, filter: FilterExpr) -> anyhow::Result<Self> {
+        filter.validate()?;
+        self.filters.push(filter);
+        Ok(self)
+    }
+
+    pub async fn send(self) -> anyhow::Result<SearchResponse> {
+        let endpoint = more_like_this_endpoint_url(&self.client.base_url, &self.record_id)?;
+        let mut params = vec![
+            ("page", self.page.to_string()),
+            ("per_page", self.per_page.to_string()),
+        ];
+        if !self.fields.is_empty() {
+            params.push(("fields", self.fields.join(",")));
+        }
+        let mut filter_params = Vec::new();
+        for filter in &self.filters {
+            filter.append_params(&[], &mut filter_params);
+        }
+
+        let mut request = self
+            .client
+            .http_client
+            .get(endpoint)
+            .query(&params)
+            .query(&filter_params);
+        if !self.client.api_key.is_empty() && !self.client.legacy_query_key_auth {
+            request = request.header("Authentication-Token", &self.client.api_key);
+        }
+        let response = request
+            .send()
+            .await
+            .map_err(|_| anyhow::Error::new(DnzError::Transport))?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(anyhow::Error::new(DnzError::HttpStatus {
+                status: status.as_u16(),
+                retry_after: retry_after_delay(response.headers()),
+            }));
+        }
+        let payload = response
+            .json::<serde_json::Value>()
+            .await
+            .map_err(|err| anyhow::Error::new(DnzError::Decode).context(err))?;
+        normalize_search_response(payload)
     }
 }
 
@@ -849,8 +993,15 @@ impl QueryBuilder {
                 Ok(resp) => {
                     let status = resp.status();
                     if status.is_success() {
-                        match resp.json::<SearchResponse>().await {
-                            Ok(parsed) => break parsed,
+                        match resp.json::<serde_json::Value>().await {
+                            Ok(payload) => match normalize_search_response(payload) {
+                                Ok(parsed) => break parsed,
+                                Err(e) => {
+                                    if attempt >= max_retries {
+                                        return Err(anyhow::Error::new(DnzError::Decode).context(e));
+                                    }
+                                }
+                            },
                             Err(e) => {
                                 if attempt >= max_retries {
                                     return Err(anyhow::Error::new(DnzError::Decode).context(e));
@@ -920,6 +1071,68 @@ fn retry_after_delay(headers: &reqwest::header::HeaderMap) -> Option<Duration> {
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.trim().parse::<u64>().ok())
         .map(|seconds| Duration::from_secs(seconds.min(60)))
+}
+
+fn record_endpoint_url(base_url: &str, record_id: &str) -> anyhow::Result<String> {
+    let mut url = reqwest::Url::parse(base_url)?;
+    let mut segments: Vec<String> = url
+        .path_segments()
+        .map(|values| values.map(str::to_string).collect())
+        .unwrap_or_default();
+    let format = segments
+        .last()
+        .and_then(|segment| {
+            segment
+                .split_once('.')
+                .map(|(_, format)| format.to_string())
+        })
+        .filter(|format| matches!(format.as_str(), "json" | "xml" | "rss"))
+        .unwrap_or_else(|| "json".to_string());
+    if segments
+        .last()
+        .is_some_and(|segment| segment.starts_with("records."))
+    {
+        segments.pop();
+    } else if segments.last().is_some_and(|segment| segment == "records") {
+        segments.pop();
+    }
+    segments.push("records".to_string());
+    segments.push(format!("{record_id}.{format}"));
+
+    {
+        let mut path = url
+            .path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("DigitalNZ base URL cannot accept path segments"))?;
+        path.clear();
+        path.extend(segments.iter().map(String::as_str));
+    }
+    Ok(url.to_string())
+}
+
+fn more_like_this_endpoint_url(base_url: &str, record_id: &str) -> anyhow::Result<String> {
+    let record_url = record_endpoint_url(base_url, record_id)?;
+    let mut url = reqwest::Url::parse(&record_url)?;
+    let mut segments: Vec<String> = url
+        .path_segments()
+        .map(|values| values.map(str::to_string).collect())
+        .unwrap_or_default();
+    let record_segment = segments
+        .pop()
+        .ok_or_else(|| anyhow::anyhow!("DigitalNZ record URL has no record segment"))?;
+    let (record_id_segment, format) = record_segment
+        .split_once('.')
+        .map(|(record_id, format)| (record_id.to_string(), format.to_string()))
+        .unwrap_or((record_segment, "json".to_string()));
+    segments.push(record_id_segment);
+    segments.push(format!("more_like_this.{format}"));
+    {
+        let mut path = url
+            .path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("DigitalNZ base URL cannot accept path segments"))?;
+        path.clear();
+        path.extend(segments.iter().map(String::as_str));
+    }
+    Ok(url.to_string())
 }
 
 fn is_local_test_url(value: &str) -> bool {

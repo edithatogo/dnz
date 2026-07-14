@@ -1,18 +1,18 @@
 schema_version: 2
-last_updated_utc: 2026-07-14T07:18:00Z
-repository_head: df042f1
+last_updated_utc: 2026-07-14T08:42:00Z
+repository_head: 6bbd617
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
-active_track: T02
-active_slice: search-contract-executable-verification
+active_track: T03
+active_slice: record-and-mlt-endpoint-normalization
 status: in_progress
 
 track_status:
   T00: complete
-  T01: in_progress
-  T02: in_progress
-  T03: not_started
+  T01: complete
+  T02: complete
+  T03: in_progress
   T04: not_started
   T05: not_started
   T06: in_progress
@@ -26,23 +26,29 @@ verified_gates:
   - cargo metadata --no-deps --format-version 1
   - scripts/workspace-doctor.ps1 (GNU route, 50.39 GB free)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (57 unit, 4 integration, 5 property, 0 doctest failures)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (60 unit, 6 integration, 5 property, 0 doctest failures)
 completed_tracks:
   - T00
+  - T01
+  - T02
 blocked_tracks: []
 in_progress_tracks:
+  - T03
   - T06
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
   - conductor/evidence/2026-07-13-t01-t06-slice.md
   - conductor/evidence/2026-07-14-t01-t02-executable-gate.md
+  - conductor/evidence/2026-07-14-t03-endpoints-models.md
 latest_handoff: conductor/handoff.md
 notes:
   - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
   - state.yaml is the sole source for current status, blockers, verification, and handoff state.
   - The legacy tracks.md is now a compatibility index and must not contain independent track statuses.
-  - T01 executable verification is unblocked locally through the GNU Rust route; remaining T01 work is track closeout and GitHub evidence mirroring.
-  - T02 query-contract implementation and executable serializer/integration/property verification now pass locally; remaining work is review/closeout and uncovered acceptance items.
-  - T03-T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
+  - T01 transport/auth/cache/error acceptance is verified by the executable core gate and is complete.
+  - T02 query-contract acceptance is verified by the executable serializer/integration/property gate and is complete.
+  - T03 now has record and More Like This builders, tolerant response normalization, typed common fields, integer/string IDs, and unknown-field preservation; XML/RSS and broader error-shape coverage remain.
+  - T04-T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
   - T06 dense harvest truncation was removed in an earlier slice; export/vector/Python correctness items remain.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.
