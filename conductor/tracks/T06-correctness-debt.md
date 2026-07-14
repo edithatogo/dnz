@@ -5,8 +5,8 @@ Fix cache lifecycle/identity, dedupe data loss, XML escaping, date sorting, cita
 
 ## Completion record
 
-Status: in_progress
+Status: complete
 
 Evidence: conductor/evidence/2026-07-13-t01-t06-slice.md
 
-Open decisions/blockers: Remaining export correctness items include atomic publication and manifest/file reconciliation. Dense harvest partition truncation at 1,000 records is removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, and truthful schema metadata are now verified.
+Open decisions/blockers: No known repo-side T06 correctness items remain in the current slice. Dense harvest partition truncation at 1,000 records is removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
