@@ -1,5 +1,7 @@
 //! Models mapping to DigitalNZ API v3 schemas.
 
+use quick_xml::events::Event;
+use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -241,6 +243,212 @@ pub fn normalize_search_response(value: serde_json::Value) -> anyhow::Result<Sea
     }
 }
 
+/// Normalize the verified DigitalNZ v3 XML search response shape.
+pub fn normalize_xml_search_response(xml: &[u8]) -> anyhow::Result<SearchResponse> {
+    let root = parse_xml_document(xml)?;
+    if root.name != "search" {
+        anyhow::bail!("XML search response root must be <search>");
+    }
+
+    let result_count = child_text(&root, &["result-count", "result_count"])
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or_default();
+    let page = child_text(&root, &["page"]).and_then(|value| value.parse::<u32>().ok());
+    let per_page =
+        child_text(&root, &["per-page", "per_page"]).and_then(|value| value.parse::<u32>().ok());
+    let request = child_text(&root, &["request-url", "request_url"])
+        .map(|url| serde_json::json!({"url": url}));
+    let results = root
+        .children
+        .iter()
+        .find(|child| child.name == "results")
+        .map(|results| {
+            results
+                .children
+                .iter()
+                .filter(|child| child.name == "result")
+                .map(xml_record_value)
+                .collect::<anyhow::Result<Vec<_>>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+
+    Ok(SearchResponse {
+        search: SearchMetadata {
+            result_count,
+            page,
+            per_page,
+            results: results
+                .into_iter()
+                .map(serde_json::from_value)
+                .collect::<Result<Vec<Record>, _>>()?,
+            facets: HashMap::new(),
+            request,
+        },
+    })
+}
+
+/// Normalize one record returned in the verified DigitalNZ v3 XML format.
+pub fn normalize_xml_record_response(xml: &[u8]) -> anyhow::Result<Record> {
+    let root = parse_xml_document(xml)?;
+    if root.name == "result" || root.name == "record" {
+        return serde_json::from_value(xml_record_value(&root)?).map_err(Into::into);
+    }
+    normalize_xml_search_response(xml)?
+        .search
+        .results
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("XML record response contains no records"))
+}
+
+#[derive(Debug, Default)]
+struct XmlNode {
+    name: String,
+    text: String,
+    children: Vec<XmlNode>,
+}
+
+fn parse_xml_document(xml: &[u8]) -> anyhow::Result<XmlNode> {
+    let mut reader = Reader::from_reader(xml);
+    reader.config_mut().trim_text(true);
+    let mut buffer = Vec::new();
+    let mut stack: Vec<XmlNode> = Vec::new();
+    let mut root = None;
+
+    loop {
+        match reader.read_event_into(&mut buffer)? {
+            Event::Start(start) => stack.push(XmlNode {
+                name: String::from_utf8(start.name().as_ref().to_vec())?,
+                ..XmlNode::default()
+            }),
+            Event::Empty(empty) => attach_xml_node(
+                &mut stack,
+                &mut root,
+                XmlNode {
+                    name: String::from_utf8(empty.name().as_ref().to_vec())?,
+                    ..XmlNode::default()
+                },
+            )?,
+            Event::Text(text) => {
+                if let Some(node) = stack.last_mut() {
+                    node.text.push_str(&text.unescape()?);
+                }
+            }
+            Event::CData(text) => {
+                if let Some(node) = stack.last_mut() {
+                    node.text.push_str(&String::from_utf8_lossy(text.as_ref()));
+                }
+            }
+            Event::End(_) => {
+                let node = stack
+                    .pop()
+                    .ok_or_else(|| anyhow::anyhow!("XML response has an unexpected end tag"))?;
+                attach_xml_node(&mut stack, &mut root, node)?;
+            }
+            Event::DocType(_) => {
+                anyhow::bail!("XML response contains unsupported entity declarations")
+            }
+            Event::Eof => break,
+            Event::Decl(_) | Event::Comment(_) | Event::PI(_) => {}
+        }
+        buffer.clear();
+    }
+
+    if !stack.is_empty() {
+        anyhow::bail!("XML response is not well formed");
+    }
+    root.ok_or_else(|| anyhow::anyhow!("XML response is empty"))
+}
+
+fn attach_xml_node(
+    stack: &mut [XmlNode],
+    root: &mut Option<XmlNode>,
+    node: XmlNode,
+) -> anyhow::Result<()> {
+    if let Some(parent) = stack.last_mut() {
+        parent.children.push(node);
+    } else if root.replace(node).is_some() {
+        anyhow::bail!("XML response contains multiple roots");
+    }
+    Ok(())
+}
+
+fn child_text<'a>(node: &'a XmlNode, names: &[&str]) -> Option<&'a str> {
+    node.children
+        .iter()
+        .find(|child| names.contains(&child.name.as_str()))
+        .map(|child| child.text.as_str())
+}
+
+fn xml_record_value(node: &XmlNode) -> anyhow::Result<serde_json::Value> {
+    let mut object = serde_json::Map::new();
+    for child in &node.children {
+        let key = child.name.replace('-', "_");
+        let mut value = xml_node_value(child);
+        if matches!(
+            key.as_str(),
+            "category"
+                | "collection"
+                | "content_partner"
+                | "creator"
+                | "date"
+                | "dc_identifier"
+                | "dc_type"
+                | "format"
+                | "language"
+                | "placename"
+                | "subject"
+        ) && !value.is_array()
+        {
+            value = serde_json::Value::Array(vec![value]);
+        }
+        if key == "is_commercial_use" {
+            if let Some(text) = value.as_str() {
+                value = serde_json::Value::Bool(text.eq_ignore_ascii_case("true"));
+            }
+        }
+        if let Some(existing) = object.remove(&key) {
+            let mut values = match existing {
+                serde_json::Value::Array(values) => values,
+                other => vec![other],
+            };
+            match value {
+                serde_json::Value::Array(mut additional) => values.append(&mut additional),
+                other => values.push(other),
+            }
+            object.insert(key, serde_json::Value::Array(values));
+        } else {
+            object.insert(key, value);
+        }
+    }
+    Ok(serde_json::Value::Object(object))
+}
+
+fn xml_node_value(node: &XmlNode) -> serde_json::Value {
+    if node.children.is_empty() {
+        return serde_json::Value::String(node.text.clone());
+    }
+    if node
+        .children
+        .iter()
+        .all(|child| child.name == node.children[0].name)
+    {
+        return serde_json::Value::Array(node.children.iter().map(xml_node_value).collect());
+    }
+    let mut object = serde_json::Map::new();
+    if !node.text.is_empty() {
+        object.insert(
+            "_text".to_string(),
+            serde_json::Value::String(node.text.clone()),
+        );
+    }
+    for child in &node.children {
+        object.insert(child.name.replace('-', "_"), xml_node_value(child));
+    }
+    serde_json::Value::Object(object)
+}
+
 fn first_record_from_collection(value: serde_json::Value) -> anyhow::Result<serde_json::Value> {
     let results = match value {
         serde_json::Value::Object(mut object) => object
@@ -418,6 +626,68 @@ mod tests {
             response.search.request,
             Some(serde_json::json!({"text": "harbour"}))
         );
+    }
+
+    #[test]
+    fn normalize_xml_search_response_accepts_verified_v3_shape() {
+        let xml = br#"<?xml version="1.0" encoding="UTF-8"?>
+<search>
+  <page type="integer">1</page>
+  <per-page type="integer">1</per-page>
+  <result-count type="integer">1</result-count>
+  <request-url>https://api.example.test/records.xml?text=kiwi&amp;per_page=1</request-url>
+  <results type="array">
+    <result>
+      <id type="integer">41278482</id>
+      <title>John &amp; Jane</title>
+      <content-partner>Partner A</content-partner>
+      <subject>history</subject>
+      <subject>people</subject>
+      <is-commercial-use>true</is-commercial-use>
+      <provider-extension>kept</provider-extension>
+    </result>
+  </results>
+  <facets type="array"/>
+</search>"#;
+
+        let response = normalize_xml_search_response(xml).unwrap();
+        assert_eq!(response.search.page, Some(1));
+        assert_eq!(response.search.per_page, Some(1));
+        assert_eq!(response.search.result_count, 1);
+        assert_eq!(response.search.results[0].id, "41278482");
+        assert_eq!(response.search.results[0].title, "John & Jane");
+        assert_eq!(
+            response.search.results[0].subject,
+            Some(vec!["history".to_string(), "people".to_string()])
+        );
+        assert_eq!(response.search.results[0].is_commercial_use, Some(true));
+        assert_eq!(
+            response.search.results[0].extra_fields["provider_extension"],
+            "kept"
+        );
+        assert_eq!(
+            response.search.request,
+            Some(serde_json::json!({
+                "url": "https://api.example.test/records.xml?text=kiwi&per_page=1"
+            }))
+        );
+    }
+
+    #[test]
+    fn normalize_xml_record_response_accepts_direct_result() {
+        let xml = br#"<result><id type="integer">7</id><title>Seven</title></result>"#;
+        let record = normalize_xml_record_response(xml).unwrap();
+        assert_eq!(record.id, "7");
+        assert_eq!(record.title, "Seven");
+    }
+
+    #[test]
+    fn normalize_xml_response_rejects_doctype_entities() {
+        let xml = br#"<!DOCTYPE search [<!ENTITY secret "hidden">]><search><results/></search>"#;
+        let error = normalize_xml_search_response(xml).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("unsupported entity declarations"));
     }
 
     #[test]

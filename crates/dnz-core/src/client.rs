@@ -2,7 +2,10 @@
 
 use crate::cache::PersistentCache;
 use crate::errors::DnzError;
-use crate::models::{normalize_record_response, normalize_search_response, Record, SearchResponse};
+use crate::models::{
+    normalize_record_response, normalize_search_response, normalize_xml_record_response,
+    normalize_xml_search_response, Record, SearchResponse,
+};
 use reqwest::Client as HttpClient;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -143,6 +146,7 @@ impl RecordQueryBuilder {
     /// Fetch and normalize one record from a verified response shape.
     pub async fn send(self) -> anyhow::Result<Record> {
         let endpoint = record_endpoint_url(&self.client.base_url, &self.record_id)?;
+        let format = response_format(&endpoint)?;
         let mut params = Vec::new();
         if !self.fields.is_empty() {
             params.push(("fields", self.fields.join(",")));
@@ -166,10 +170,10 @@ impl RecordQueryBuilder {
         }
 
         let payload = response
-            .json::<serde_json::Value>()
+            .bytes()
             .await
             .map_err(|err| anyhow::Error::new(DnzError::Decode).context(err))?;
-        normalize_record_response(payload)
+        decode_record_response(format, &payload)
     }
 }
 
@@ -208,6 +212,7 @@ impl MoreLikeThisQueryBuilder {
 
     pub async fn send(self) -> anyhow::Result<SearchResponse> {
         let endpoint = more_like_this_endpoint_url(&self.client.base_url, &self.record_id)?;
+        let format = response_format(&endpoint)?;
         let mut params = vec![
             ("page", self.page.to_string()),
             ("per_page", self.per_page.to_string()),
@@ -241,10 +246,10 @@ impl MoreLikeThisQueryBuilder {
             }));
         }
         let payload = response
-            .json::<serde_json::Value>()
+            .bytes()
             .await
             .map_err(|err| anyhow::Error::new(DnzError::Decode).context(err))?;
-        normalize_search_response(payload)
+        decode_search_response(format, &payload)
     }
 }
 
@@ -994,8 +999,11 @@ impl QueryBuilder {
                 Ok(resp) => {
                     let status = resp.status();
                     if status.is_success() {
-                        match resp.json::<serde_json::Value>().await {
-                            Ok(payload) => match normalize_search_response(payload) {
+                        match resp.bytes().await {
+                            Ok(payload) => match decode_search_response(
+                                response_format(&self.client.base_url)?,
+                                &payload,
+                            ) {
                                 Ok(parsed) => break parsed,
                                 Err(e) => {
                                     if attempt >= max_retries {
@@ -1072,6 +1080,58 @@ fn retry_after_delay(headers: &reqwest::header::HeaderMap) -> Option<Duration> {
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.trim().parse::<u64>().ok())
         .map(|seconds| Duration::from_secs(seconds.min(60)))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResponseFormat {
+    Json,
+    Xml,
+    Rss,
+}
+
+fn response_format(base_url: &str) -> anyhow::Result<ResponseFormat> {
+    let url = reqwest::Url::parse(base_url)?;
+    let format = url
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .and_then(|segment| segment.rsplit_once('.').map(|(_, format)| format))
+        .unwrap_or("json");
+    match format {
+        "json" => Ok(ResponseFormat::Json),
+        "xml" => Ok(ResponseFormat::Xml),
+        "rss" => Ok(ResponseFormat::Rss),
+        other => Err(anyhow::Error::new(DnzError::UnsupportedFormat {
+            format: other.to_string(),
+        })),
+    }
+}
+
+fn decode_search_response(format: ResponseFormat, body: &[u8]) -> anyhow::Result<SearchResponse> {
+    match format {
+        ResponseFormat::Rss => Err(anyhow::Error::new(DnzError::UnsupportedFormat {
+            format: "rss".to_string(),
+        })),
+        ResponseFormat::Json => serde_json::from_slice(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error))
+            .and_then(normalize_search_response)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
+        ResponseFormat::Xml => normalize_xml_search_response(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
+    }
+}
+
+fn decode_record_response(format: ResponseFormat, body: &[u8]) -> anyhow::Result<Record> {
+    match format {
+        ResponseFormat::Rss => Err(anyhow::Error::new(DnzError::UnsupportedFormat {
+            format: "rss".to_string(),
+        })),
+        ResponseFormat::Json => serde_json::from_slice(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error))
+            .and_then(normalize_record_response)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
+        ResponseFormat::Xml => normalize_xml_record_response(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
+    }
 }
 
 fn record_endpoint_url(base_url: &str, record_id: &str) -> anyhow::Result<String> {

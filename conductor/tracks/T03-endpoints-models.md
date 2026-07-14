@@ -9,4 +9,4 @@ Status: in_progress
 
 Evidence: conductor/evidence/2026-07-14-t03-endpoints-models.md
 
-Open decisions/blockers: XML/RSS parsing remains gated by verified fixture evidence. JSON endpoint error-shape coverage is complete for the current builders.
+Open decisions/blockers: RSS parsing remains gated by a stable upstream fixture; the official live RSS endpoint returned HTTP 500 on 2026-07-14. JSON and verified XML endpoint error-shape coverage is complete for the current builders.

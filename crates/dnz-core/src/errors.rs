@@ -13,6 +13,8 @@ pub enum DnzError {
     Decode,
     #[error("DigitalNZ request failed during transport")]
     Transport,
+    #[error("DigitalNZ response format is not supported: {format}")]
+    UnsupportedFormat { format: String },
 }
 
 impl DnzError {

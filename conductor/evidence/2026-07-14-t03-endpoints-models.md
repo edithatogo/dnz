@@ -9,6 +9,7 @@ Implemented and tested:
 - Flattened unknown provider fields retained in `Record::extra_fields`.
 - Search normalization for the existing envelope and flat `records`/`results` response shapes.
 - Optional page/per-page, facets, and request metadata are preserved for both envelope and flat shapes.
+- Verified XML support now parses the live v3 `<search>` shape, hyphenated field names, typed pagination, repeated values, direct record responses, and path-safe search/record builders.
 
 Verification:
 
@@ -16,15 +17,20 @@ Verification:
 cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features
 ```
 
-Pass: 61 unit tests, 8 client integration tests, 5 property tests, and 0 doctests failed.
+Pass: 68 unit tests, 9 client integration tests, 5 property tests, and 0 doctests failed.
 
 Workspace verification also passed with `cargo fmt --all -- --check`,
 `cargo metadata --no-deps --format-version 1`, `git diff --check`, and
 `cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets
 --all-features -- -D warnings` using the repository `.pixi` Python interpreter.
 
+The official v3 XML endpoint was queried without credentials on 2026-07-14 and
+returned the fixture shape covered by the tests. The corresponding RSS endpoint
+returned HTTP 500, so RSS parsing remains explicitly unsupported pending a stable
+upstream fixture.
+
 The expanded client integration coverage verifies structured mapping for HTTP
 400, 403, 404, 429, 500, 502, and 503 responses; bounded `Retry-After`; stable
 malformed-JSON decode errors; MLT status mapping; and secret-safe error text.
 
-Remaining T03 work is XML/RSS parsing only after verified fixtures are available. JSON endpoint error-shape coverage is complete for the current builders.
+Remaining T03 work is RSS parsing only after a stable upstream fixture is available. JSON and verified XML endpoint coverage is complete for the current builders.
