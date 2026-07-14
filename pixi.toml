@@ -9,6 +9,7 @@ platforms = ["win-64", "linux-64", "osx-64"]
 [dependencies]
 rust = ">=1.75"
 python = ">=3.12,<3.13"
+maturin = ">=1.0,<2"
 cargo-mutants = ">=24.0.0"
 cargo-llvm-cov = ">=0.6"
 cargo-audit = ">=0.22.1"
@@ -32,6 +33,6 @@ package-metadata = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/
 verify-local = { depends-on = ["fmt", "clippy", "test", "audit", "doctor", "tmdl-validate", "package-metadata"] }
 verify = { depends-on = ["fmt", "clippy", "test", "coverage", "audit", "doctor"] }
 dry-run-cargo = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-cargo-publish-dryruns.ps1 -AllowDirty"
-dry-run-maturin = "maturin build --release --manifest-path crates/dnz-python/Cargo.toml"
+dry-run-maturin = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-python-wheel.ps1"
 dry-run-python = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-python-wheel.ps1"
 mcpb = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-mcpb.ps1 -AllowDirty"

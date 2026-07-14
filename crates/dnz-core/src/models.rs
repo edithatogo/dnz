@@ -302,11 +302,82 @@ pub fn normalize_xml_record_response(xml: &[u8]) -> anyhow::Result<Record> {
         .ok_or_else(|| anyhow::anyhow!("XML record response contains no records"))
 }
 
+/// Normalize a standard RSS 2.0 response into the common search model.
+pub fn normalize_rss_search_response(xml: &[u8]) -> anyhow::Result<SearchResponse> {
+    let root = parse_xml_document(xml)?;
+    let records = descendant_nodes(&root, "item")
+        .iter()
+        .map(|item| serde_json::from_value(rss_item_value(item)))
+        .collect::<Result<Vec<Record>, _>>()?;
+    Ok(SearchResponse {
+        search: SearchMetadata {
+            result_count: records.len() as u64,
+            page: None,
+            per_page: None,
+            results: records,
+            facets: HashMap::new(),
+            request: None,
+        },
+    })
+}
+
+/// Normalize the first RSS item as a record response.
+pub fn normalize_rss_record_response(xml: &[u8]) -> anyhow::Result<Record> {
+    normalize_rss_search_response(xml)?
+        .search
+        .results
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("RSS response contains no items"))
+}
+
 #[derive(Debug, Default)]
 struct XmlNode {
     name: String,
     text: String,
     children: Vec<XmlNode>,
+}
+
+fn descendant_nodes<'a>(node: &'a XmlNode, name: &str) -> Vec<&'a XmlNode> {
+    let mut matches = Vec::new();
+    if node.name.rsplit(':').next().unwrap_or(&node.name) == name {
+        matches.push(node);
+    }
+    for child in &node.children {
+        matches.extend(descendant_nodes(child, name));
+    }
+    matches
+}
+
+fn rss_item_value(item: &XmlNode) -> serde_json::Value {
+    let mut object = serde_json::Map::new();
+    let mut repeated: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
+    for child in &item.children {
+        let name = child.name.rsplit(':').next().unwrap_or(&child.name);
+        let key = match name {
+            "guid" => "id",
+            "link" => "source_url",
+            "pubDate" | "published" | "updated" => "syndication_date",
+            other => other,
+        }
+        .replace('-', "_");
+        let value = serde_json::Value::String(child.text.clone());
+        if matches!(key.as_str(), "category" | "subject" | "creator") {
+            repeated.entry(key).or_default().push(value);
+        } else {
+            object.insert(key, value);
+        }
+    }
+    for (key, values) in repeated {
+        object.insert(key, serde_json::Value::Array(values));
+    }
+    object
+        .entry("id")
+        .or_insert_with(|| serde_json::Value::String(String::new()));
+    object
+        .entry("title")
+        .or_insert_with(|| serde_json::Value::String(String::new()));
+    serde_json::Value::Object(object)
 }
 
 fn parse_xml_document(xml: &[u8]) -> anyhow::Result<XmlNode> {
@@ -688,6 +759,26 @@ mod tests {
         assert!(error
             .to_string()
             .contains("unsupported entity declarations"));
+    }
+
+    #[test]
+    fn normalize_rss_fixture_accepts_standard_items() {
+        let response = normalize_rss_search_response(include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/digitalnz-search.rss"
+        )))
+        .unwrap();
+
+        assert_eq!(response.search.result_count, 1);
+        assert_eq!(response.search.results[0].id, "41278482");
+        assert_eq!(
+            response.search.results[0].source_url.as_deref(),
+            Some("https://digitalnz.org/records/41278482")
+        );
+        assert_eq!(
+            response.search.results[0].category,
+            Some(vec!["Images".to_string(), "Photographs".to_string()])
+        );
     }
 
     #[test]

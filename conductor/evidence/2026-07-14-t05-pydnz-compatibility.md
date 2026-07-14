@@ -19,6 +19,8 @@ Pass: native extension check completed without diagnostics and Python facade com
 
 Remaining T05 work: broaden behavioral tests for all documented filter and pagination combinations and produce a wheel-level import test.
 
-External validation blocker: `pixi run dry-run-maturin` resolves the repository
-packaging task but fails because `maturin` is not installed in the configured
-Pixi environment (`maturin: command not found`).
+Packaging remediation: `maturin` is now declared in `pixi.toml` and locked for
+all platforms. The packaging task routes Cargo through the validated GNU
+toolchain and isolated target directory; the old default-MSVC route is no
+longer used. A final wheel artifact still requires the long-running GNU build
+to complete in the local runner.

@@ -47,6 +47,29 @@ async fn test_mock_search_request() {
 }
 
 #[tokio::test]
+async fn test_rss_search_fixture_is_normalized() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/records.rss"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(include_str!("fixtures/digitalnz-search.rss")),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let response = Client::unauthenticated()
+        .with_base_url(format!("{}/records.rss", mock_server.uri()))
+        .search("kiwi")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.search.result_count, 1);
+    assert_eq!(response.search.results[0].id, "41278482");
+}
+
+#[tokio::test]
 async fn xml_search_and_record_endpoints_use_verified_normalization() {
     let mock_server = MockServer::start().await;
     let xml = r#"<?xml version="1.0" encoding="UTF-8"?>

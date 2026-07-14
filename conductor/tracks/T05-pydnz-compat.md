@@ -9,4 +9,4 @@ Status: not_started
 
 Evidence: none
 
-Open decisions/blockers: wheel-level import validation is externally blocked because the configured Pixi environment has no `maturin` executable; broader behavioral coverage remains.
+Open decisions/blockers: `maturin` is now provisioned and the task routes through GNU Rust; wheel-level artifact/import verification remains pending completion of the long-running local build. Broader behavioral coverage remains.
