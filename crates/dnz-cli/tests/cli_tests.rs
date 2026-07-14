@@ -168,3 +168,52 @@ fn test_cli_parses_gazette_export_command() {
         other => panic!("expected gazette-export command, got {other:?}"),
     }
 }
+
+#[test]
+fn test_cli_parses_record_and_more_like_this_commands() {
+    let record = dnz_cli::Cli::parse_from([
+        "dnz",
+        "record",
+        "37757055",
+        "--fields",
+        "title,source_url",
+        "--format",
+        "text",
+    ]);
+    match record.command {
+        dnz_cli::Commands::Record { id, fields, format } => {
+            assert_eq!(id, "37757055");
+            assert_eq!(fields, vec!["title", "source_url"]);
+            assert_eq!(format, dnz_cli::Format::Text);
+        }
+        other => panic!("expected record command, got {other:?}"),
+    }
+
+    let related = dnz_cli::Cli::parse_from([
+        "dnz",
+        "more-like-this",
+        "37757055",
+        "--page",
+        "2",
+        "--limit",
+        "5",
+        "--fields",
+        "title,subject",
+    ]);
+    match related.command {
+        dnz_cli::Commands::MoreLikeThis {
+            id,
+            page,
+            limit,
+            fields,
+            format,
+        } => {
+            assert_eq!(id, "37757055");
+            assert_eq!(page, 2);
+            assert_eq!(limit, 5);
+            assert_eq!(fields, vec!["title", "subject"]);
+            assert_eq!(format, dnz_cli::Format::Json);
+        }
+        other => panic!("expected more-like-this command, got {other:?}"),
+    }
+}

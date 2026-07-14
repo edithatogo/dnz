@@ -4,8 +4,8 @@ repository_head: e49af73
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
-active_track: T03
-active_slice: record-and-mlt-endpoint-normalization
+active_track: T04
+active_slice: cli-record-and-mlt-parity
 status: in_progress
 
 track_status:
@@ -13,7 +13,7 @@ track_status:
   T01: complete
   T02: complete
   T03: in_progress
-  T04: not_started
+  T04: in_progress
   T05: not_started
   T06: complete
   T07: not_started
@@ -45,12 +45,14 @@ completed_tracks:
 blocked_tracks: []
 in_progress_tracks:
   - T03
+  - T04
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
   - conductor/evidence/2026-07-13-t01-t06-slice.md
   - conductor/evidence/2026-07-14-t01-t02-executable-gate.md
   - conductor/evidence/2026-07-14-t03-endpoints-models.md
+  - conductor/evidence/2026-07-14-t04-cli-parity.md
 latest_handoff: conductor/handoff.md
 notes:
   - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
@@ -59,6 +61,7 @@ notes:
   - T01 transport/auth/cache/error acceptance is verified by the executable core gate and is complete.
   - T02 query-contract acceptance is verified by the executable serializer/integration/property gate and is complete.
   - T03 now has record and More Like This builders, tolerant JSON/XML response normalization, typed common fields, integer/string IDs, unknown-field preservation, structured pagination/request metadata, and broad structured error coverage; RSS parsing remains gated by a stable upstream fixture.
-  - T04-T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
+  - T04 CLI record and More Like This parity is verified; Python typed/raw results, MCP record/MLT schemas, and documentation remain.
+  - T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
   - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.

@@ -156,6 +156,45 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
+        Commands::Record { id, fields, format } => {
+            let client = build_client(resolve_api_key(args.api_key)?, args.cache_path.clone())?;
+            let record = client.record(id).fields(fields).send().await?;
+            match format {
+                Format::Json => println!("{}", serde_json::to_string_pretty(&record)?),
+                Format::Text => println!("[{}] {}", record.id, record.title),
+                Format::Markdown => {
+                    println!(
+                        "# DigitalNZ Record\n\n- **ID:** {}\n- **Title:** {}",
+                        record.id, record.title
+                    );
+                }
+            }
+        }
+        Commands::MoreLikeThis {
+            id,
+            page,
+            limit,
+            fields,
+            format,
+        } => {
+            let client = build_client(resolve_api_key(args.api_key)?, args.cache_path.clone())?;
+            let response = client
+                .more_like_this(id)
+                .page(page)
+                .per_page(limit)
+                .fields(fields)
+                .send()
+                .await?;
+            match format {
+                Format::Json => println!("{}", serde_json::to_string_pretty(&response)?),
+                Format::Text | Format::Markdown => {
+                    println!("Results found: {}", response.search.result_count);
+                    for record in response.search.results {
+                        println!("- [{}] {}", record.id, record.title);
+                    }
+                }
+            }
+        }
         Commands::GazetteExport {
             output,
             text,
