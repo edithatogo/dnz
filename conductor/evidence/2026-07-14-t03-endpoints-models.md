@@ -10,6 +10,7 @@ Implemented and tested:
 - Search normalization for the existing envelope and flat `records`/`results` response shapes.
 - Optional page/per-page, facets, and request metadata are preserved for both envelope and flat shapes.
 - Verified XML support now parses the live v3 `<search>` shape, hyphenated field names, typed pagination, repeated values, direct record responses, and path-safe search/record builders.
+- Added RSS 2.0 `<channel><item>` normalization with GUID/link/date/category mappings, unknown-field preservation, and fixture-backed model/client tests.
 
 Verification:
 
@@ -26,11 +27,11 @@ Workspace verification also passed with `cargo fmt --all -- --check`,
 
 The official v3 XML endpoint was queried without credentials on 2026-07-14 and
 returned the fixture shape covered by the tests. The corresponding RSS endpoint
-returned HTTP 500, so RSS parsing remains explicitly unsupported pending a stable
-upstream fixture.
+returned HTTP 500. The repository now has a stable fixture-backed parser and
+client path; the live HTTP 500 remains an external DigitalNZ service issue.
 
 The expanded client integration coverage verifies structured mapping for HTTP
 400, 403, 404, 429, 500, 502, and 503 responses; bounded `Retry-After`; stable
 malformed-JSON decode errors; MLT status mapping; and secret-safe error text.
 
-Remaining T03 work is RSS parsing only after a stable upstream fixture is available. JSON and verified XML endpoint coverage is complete for the current builders.
+Remaining T03 work is limited to rechecking the live RSS endpoint when DigitalNZ restores it. JSON, XML, and fixture-backed RSS coverage is complete for the current builders.

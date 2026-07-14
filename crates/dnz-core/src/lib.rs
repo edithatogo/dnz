@@ -30,6 +30,8 @@ pub use export::generate_schema_ld;
 pub use export::GazetteExportConfig;
 pub use export::GazetteExportManifest;
 pub use models::normalize_record_response;
+pub use models::normalize_rss_record_response;
+pub use models::normalize_rss_search_response;
 pub use models::normalize_search_response;
 pub use models::normalize_xml_record_response;
 pub use models::normalize_xml_search_response;

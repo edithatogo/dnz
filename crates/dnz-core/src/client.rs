@@ -3,8 +3,9 @@
 use crate::cache::PersistentCache;
 use crate::errors::DnzError;
 use crate::models::{
-    normalize_record_response, normalize_search_response, normalize_xml_record_response,
-    normalize_xml_search_response, Record, SearchResponse,
+    normalize_record_response, normalize_rss_record_response, normalize_rss_search_response,
+    normalize_search_response, normalize_xml_record_response, normalize_xml_search_response,
+    Record, SearchResponse,
 };
 use reqwest::Client as HttpClient;
 use std::collections::hash_map::DefaultHasher;
@@ -1108,9 +1109,8 @@ fn response_format(base_url: &str) -> anyhow::Result<ResponseFormat> {
 
 fn decode_search_response(format: ResponseFormat, body: &[u8]) -> anyhow::Result<SearchResponse> {
     match format {
-        ResponseFormat::Rss => Err(anyhow::Error::new(DnzError::UnsupportedFormat {
-            format: "rss".to_string(),
-        })),
+        ResponseFormat::Rss => normalize_rss_search_response(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
         ResponseFormat::Json => serde_json::from_slice(body)
             .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error))
             .and_then(normalize_search_response)
@@ -1122,9 +1122,8 @@ fn decode_search_response(format: ResponseFormat, body: &[u8]) -> anyhow::Result
 
 fn decode_record_response(format: ResponseFormat, body: &[u8]) -> anyhow::Result<Record> {
     match format {
-        ResponseFormat::Rss => Err(anyhow::Error::new(DnzError::UnsupportedFormat {
-            format: "rss".to_string(),
-        })),
+        ResponseFormat::Rss => normalize_rss_record_response(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
         ResponseFormat::Json => serde_json::from_slice(body)
             .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error))
             .and_then(normalize_record_response)
