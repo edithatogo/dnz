@@ -191,6 +191,77 @@ async fn test_more_like_this_builds_endpoint_and_normalizes_flat_results() {
 }
 
 #[tokio::test]
+async fn record_and_mlt_http_statuses_remain_structured() {
+    let mock_server = MockServer::start().await;
+    for status in [400, 403, 404, 429, 500, 502, 503] {
+        Mock::given(method("GET"))
+            .and(path(format!("/records/{status}.json")))
+            .respond_with(
+                ResponseTemplate::new(status)
+                    .insert_header("Retry-After", "999")
+                    .set_body_string("provider details stay out of the stable error"),
+            )
+            .mount(&mock_server)
+            .await;
+    }
+    Mock::given(method("GET"))
+        .and(path("/records/400/more_like_this.json"))
+        .respond_with(ResponseTemplate::new(400).set_body_string("bad mlt request"))
+        .mount(&mock_server)
+        .await;
+    for status in [400, 403, 404, 429, 500, 502, 503] {
+        let error = Client::unauthenticated()
+            .with_base_url(mock_server.uri())
+            .record(status.to_string())
+            .send()
+            .await
+            .expect_err("record status should be structured");
+        let structured = error.downcast_ref::<DnzError>().unwrap();
+        assert_eq!(structured.status(), Some(status));
+        assert_eq!(
+            structured.retry_after(),
+            Some(std::time::Duration::from_secs(60))
+        );
+        assert!(!error
+            .to_string()
+            .contains("provider details stay out of the stable error"));
+    }
+
+    let error = Client::unauthenticated()
+        .with_base_url(mock_server.uri())
+        .more_like_this("400")
+        .send()
+        .await
+        .expect_err("MLT status should be structured");
+    assert_eq!(
+        error.downcast_ref::<DnzError>().unwrap().status(),
+        Some(400)
+    );
+}
+
+#[tokio::test]
+async fn record_decode_failures_are_stable_and_non_leaky() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/records/bad.json"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("not-json"))
+        .mount(&mock_server)
+        .await;
+
+    let error = Client::new("decode-secret")
+        .with_base_url(mock_server.uri())
+        .record("bad")
+        .send()
+        .await
+        .expect_err("malformed record payload should fail decoding");
+    assert!(matches!(
+        error.downcast_ref::<DnzError>(),
+        Some(&DnzError::Decode)
+    ));
+    assert!(!error.to_string().contains("decode-secret"));
+}
+
+#[tokio::test]
 async fn http_errors_are_structured_and_secret_safe() {
     let mock_server = MockServer::start().await;
     Mock::given(method("GET"))

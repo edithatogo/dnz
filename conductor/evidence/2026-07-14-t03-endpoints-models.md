@@ -15,6 +15,10 @@ Verification:
 cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features
 ```
 
-Pass: 60 unit tests, 6 client integration tests, 5 property tests, and 0 doctests failed.
+Pass: 60 unit tests, 8 client integration tests, 5 property tests, and 0 doctests failed.
+
+The expanded client integration coverage verifies structured mapping for HTTP
+400, 403, 404, 429, 500, 502, and 503 responses; bounded `Retry-After`; stable
+malformed-JSON decode errors; MLT status mapping; and secret-safe error text.
 
 Remaining T03 work is XML/RSS parsing only after verified fixtures are available, plus broader endpoint error-shape coverage.
