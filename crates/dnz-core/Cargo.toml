@@ -10,6 +10,10 @@ readme = "../../README.md"
 keywords = ["digitalnz", "heritage", "api", "client"]
 categories = ["api-bindings"]
 
+[features]
+default = ["dataframe"]
+dataframe = ["dep:polars"]
+
 [dependencies]
 tokio = { workspace = true }
 serde = { workspace = true }
@@ -20,7 +24,7 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 nutype = { workspace = true }
-polars = { workspace = true }
+polars = { workspace = true, optional = true }
 rand = { workspace = true }
 rusqlite = { workspace = true }
 

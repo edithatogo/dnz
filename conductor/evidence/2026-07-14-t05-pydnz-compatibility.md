@@ -22,5 +22,7 @@ Remaining T05 work: broaden behavioral tests for all documented filter and pagin
 Packaging remediation: `maturin` is now declared in `pixi.toml` and locked for
 all platforms. The packaging task routes Cargo through the validated GNU
 toolchain and isolated target directory; the old default-MSVC route is no
-longer used. A final wheel artifact still requires the long-running GNU build
-to complete in the local runner.
+no longer used. The Python crate now disables the optional core dataframe
+feature, keeping Polars out of the thin adapter wheel while preserving the
+core crate's dataframe default for native consumers. The final wheel artifact
+is now limited to the GNU native build completing in the local runner.
