@@ -44,7 +44,6 @@ latest_evidence:
   - conductor/evidence/2026-07-13-t01-t06-slice.md
   - conductor/evidence/2026-07-14-t01-t02-executable-gate.md
   - conductor/evidence/2026-07-14-t03-endpoints-models.md
-  - conductor/evidence/2026-07-13-t01-t06-slice.md
 latest_handoff: conductor/handoff.md
 notes:
   - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
