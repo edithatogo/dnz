@@ -1,10 +1,26 @@
-schema_version: 1
-last_updated_utc: 2026-07-13T14:00:00Z
-repository_head: 904c5ea
+schema_version: 2
+last_updated_utc: 2026-07-14T05:48:14Z
+repository_head: 3a3cd6b
 branch: codex/dnz-modernisation
+
+# Canonical status is recorded here; definitions live in manifest.yaml.
 active_track: T01
-active_slice: header-auth-cache-isolation-and-exact-zero-pagination
+active_slice: executable-focused-tests-and-ci-verification
 status: blocked
+
+track_status:
+  T00: complete
+  T01: blocked
+  T02: blocked
+  T03: not_started
+  T04: not_started
+  T05: not_started
+  T06: in_progress
+  T07: not_started
+  T08: not_started
+  T09: not_started
+  T10: not_started
+
 verified_gates:
   - cargo fmt --all -- --check
   - cargo metadata --no-deps --format-version 1
@@ -12,16 +28,20 @@ completed_tracks:
   - T00
 blocked_tracks:
   - T01
+  - T02
+in_progress_tracks:
+  - T06
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
   - conductor/evidence/2026-07-13-t01-t06-slice.md
 latest_handoff: conductor/handoff.md
 notes:
-  - Workspace test/clippy/build gates are environment-blocked by the PATH Git POSIX linker; preserve this as an external blocker until an MSVC/Windows SDK toolchain is available.
-  - T01 structured errors, Retry-After, timeout, auth-mode isolation, endpoint checks, and redacted transport diagnostics are implemented; focused runtime tests and full gates remain.
-  - T01 regression tests were added for cross-credential cache isolation and secret-safe HTTP errors; the isolated GNU test build has not produced an executable binary because dependency compilation remains resource-blocked.
-  - T02 has validated bbox, facet exclusion, facet bounds, and protected extra parameters; nested boolean filters and full contract tests remain.
-  - T06 dense harvest truncation is removed; export/vector/Python correctness items remain.
-  - The branch advanced concurrently with commits 488cfe1 and ede3f99; both were preserved and not rewritten.
-  - Subsequent concurrent commits e28eb66 and b611505 updated core blockers and conductor evidence; both were preserved.
+  - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
+  - state.yaml is the sole source for current status, blockers, verification, and handoff state.
+  - The legacy tracks.md is now a compatibility index and must not contain independent track statuses.
+  - T01 implementation and regression tests exist, but executable focused tests remain blocked by the host linker/resource environment; keep the GitHub issue open until CI or a repaired toolchain verifies them.
+  - T02 has partial query-contract implementation, but nested-filter/serializer verification remains incomplete and focused tests are not currently evidenced as passing.
+  - T03-T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
+  - T06 dense harvest truncation was removed in an earlier slice; export/vector/Python correctness items remain.
+  - Existing user and concurrent work remains unmodified; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.
