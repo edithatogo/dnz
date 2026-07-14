@@ -9,4 +9,4 @@ Status: in_progress
 
 Evidence: conductor/evidence/2026-07-13-t01-t06-slice.md
 
-Open decisions/blockers: Remaining export correctness items remain. Dense harvest partition truncation at 1,000 records is removed; vector-store dimension/upsert, secure model-download, and Python runtime lifecycle semantics are now verified.
+Open decisions/blockers: Remaining export correctness items include atomic publication and manifest/file reconciliation. Dense harvest partition truncation at 1,000 records is removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, and truthful schema metadata are now verified.
