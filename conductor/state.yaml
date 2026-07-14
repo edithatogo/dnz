@@ -68,7 +68,7 @@ notes:
   - T01 transport/auth/cache/error acceptance is verified by the executable core gate and is complete.
   - T02 query-contract acceptance is verified by the executable serializer/integration/property gate and is complete.
   - T03 now has record and More Like This builders, tolerant JSON/XML response normalization, typed common fields, integer/string IDs, unknown-field preservation, structured pagination/request metadata, and broad structured error coverage; RSS parsing remains gated by a stable upstream fixture.
-  - T04 CLI, MCP, and Python record/More Like This builder parity is verified; richer typed Python facade objects and broader documentation remain.
+  - T04 CLI, MCP, and Python raw/typed record/More Like This builder parity is verified; optional async ergonomics and broader documentation remain.
   - T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
   - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.
