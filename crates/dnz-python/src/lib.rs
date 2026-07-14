@@ -48,6 +48,26 @@ impl PyClient {
             without_filters: HashMap::new(),
         }
     }
+
+    /// Set a record ID and return a metadata builder.
+    pub fn record(&self, id: String) -> PyRecordBuilder {
+        PyRecordBuilder {
+            client: self.inner.clone(),
+            id,
+            fields: Vec::new(),
+        }
+    }
+
+    /// Set a record ID and return a More Like This builder.
+    pub fn more_like_this(&self, id: String) -> PyMoreLikeThisBuilder {
+        PyMoreLikeThisBuilder {
+            client: self.inner.clone(),
+            id,
+            page: 1,
+            per_page: 20,
+            fields: Vec::new(),
+        }
+    }
 }
 
 /// Python wrapper for query builder chaining.
@@ -140,6 +160,101 @@ impl PyQueryBuilder {
             Ok(json_str)
         })
     }
+
+    /// Return the normalized response as JSON, preserving the raw adapter contract.
+    pub fn send_raw(&self, py: Python<'_>) -> PyResult<String> {
+        self.send(py)
+    }
+}
+
+/// Python wrapper for record metadata lookup.
+#[pyclass]
+pub struct PyRecordBuilder {
+    client: Client,
+    id: String,
+    fields: Vec<String>,
+}
+
+#[pymethods]
+impl PyRecordBuilder {
+    /// Restrict the metadata fields returned for the record.
+    pub fn fields(&mut self, fields: Vec<String>) {
+        self.fields = fields;
+    }
+
+    /// Return the normalized record as JSON.
+    pub fn send(&self, py: Python<'_>) -> PyResult<String> {
+        py.detach(|| {
+            let runtime = python_runtime()?;
+            let response = runtime
+                .block_on(
+                    self.client
+                        .record(&self.id)
+                        .fields(self.fields.clone())
+                        .send(),
+                )
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+            serde_json::to_string(&response)
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+        })
+    }
+
+    /// Return the normalized record using the raw JSON adapter contract.
+    pub fn send_raw(&self, py: Python<'_>) -> PyResult<String> {
+        self.send(py)
+    }
+}
+
+/// Python wrapper for related-record lookup.
+#[pyclass]
+pub struct PyMoreLikeThisBuilder {
+    client: Client,
+    id: String,
+    page: u32,
+    per_page: u32,
+    fields: Vec<String>,
+}
+
+#[pymethods]
+impl PyMoreLikeThisBuilder {
+    /// Set result page index.
+    pub fn page(&mut self, page: u32) {
+        self.page = page;
+    }
+
+    /// Set result count limit.
+    pub fn per_page(&mut self, per_page: u32) {
+        self.per_page = per_page;
+    }
+
+    /// Restrict the fields returned in related records.
+    pub fn fields(&mut self, fields: Vec<String>) {
+        self.fields = fields;
+    }
+
+    /// Return the normalized related-record response as JSON.
+    pub fn send(&self, py: Python<'_>) -> PyResult<String> {
+        py.detach(|| {
+            let runtime = python_runtime()?;
+            let response = runtime
+                .block_on(
+                    self.client
+                        .more_like_this(&self.id)
+                        .page(self.page)
+                        .per_page(self.per_page)
+                        .fields(self.fields.clone())
+                        .send(),
+                )
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+            serde_json::to_string(&response)
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+        })
+    }
+
+    /// Return the normalized response using the raw JSON adapter contract.
+    pub fn send_raw(&self, py: Python<'_>) -> PyResult<String> {
+        self.send(py)
+    }
 }
 
 /// The dnz python module definition.
@@ -147,5 +262,7 @@ impl PyQueryBuilder {
 fn dnz(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyClient>()?;
     m.add_class::<PyQueryBuilder>()?;
+    m.add_class::<PyRecordBuilder>()?;
+    m.add_class::<PyMoreLikeThisBuilder>()?;
     Ok(())
 }

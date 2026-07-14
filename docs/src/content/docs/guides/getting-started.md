@@ -39,6 +39,12 @@ Query collection facet distributions:
 cargo run --bin dnz-cli -- facets "tui" --fields category,collection --format markdown
 ```
 
+Fetch one record or related records:
+```bash
+cargo run --bin dnz-cli -- record 37757055 --fields title,source_url --format json
+cargo run --bin dnz-cli -- more-like-this 37757055 --page 2 --limit 5 --format json
+```
+
 For a repo-local map of the API documentation surfaces and the major collections inventory derived from the checked-in facet exports, see [API Documentation Map](../generated/api-documentation-map.md) and [Major DigitalNZ Collections](../generated/digitalnz-major-collections.md).
 
 Export New Zealand Gazette records with deterministic paging, raw page JSON, normalized JSONL records, and a manifest:
@@ -47,6 +53,28 @@ cargo run --bin dnz-cli -- gazette-export --output exports/gazette --max-pages 1
 ```
 
 Gazette exports apply `primary_collection=New Zealand Gazette` automatically. They require a DigitalNZ API key from `DIGITALNZ_API_KEY` or `--api-key`; keys are used only for requests and are not written to `manifest.json`, `records.jsonl`, or raw page files. The manifest records this access decision for downstream archive validation.
+
+---
+
+## Using the Python bindings
+
+The Maturin-built `dnz` module exposes the same core builders. `send()` and
+`send_raw()` return normalized JSON strings, while unknown provider fields are
+preserved by the Rust core:
+
+```python
+from dnz import PyClient
+
+client = PyClient("your-api-key")
+record = client.record("37757055")
+record.fields(["title", "source_url"])
+record_json = record.send_raw()
+
+related = client.more_like_this("37757055")
+related.page(2)
+related.per_page(5)
+related_json = related.send()
+```
 
 ---
 
