@@ -1,6 +1,6 @@
 schema_version: 2
 last_updated_utc: 2026-07-14T10:04:29Z
-repository_head: f3c2dea
+repository_head: 2e48ffd
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
