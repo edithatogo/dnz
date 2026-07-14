@@ -68,12 +68,16 @@ pub async fn ensure_embedding_model(
     std::fs::create_dir_all(cache_dir)?;
 
     validate_model_filename(&model.filename)?;
+    validate_model_url(&model.url)?;
     let model_path = cache_dir.join(&model.filename);
     if model_path.is_file() {
         return Ok(model_path);
     }
 
-    let response = reqwest::get(&model.url).await?;
+    let http_client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+    let response = http_client.get(&model.url).send().await?;
     let status = response.status();
     if !status.is_success() {
         return Err(anyhow::anyhow!(
@@ -138,6 +142,26 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 pub struct MemoryVectorStore {
     vectors: Vec<DocumentVector>,
     dimension: Option<usize>,
+}
+
+fn validate_model_url(value: &str) -> anyhow::Result<()> {
+    let url = reqwest::Url::parse(value)
+        .map_err(|_| anyhow::anyhow!("embedding model URL must be a valid HTTPS URL"))?;
+    if url.scheme() == "https" {
+        return Ok(());
+    }
+
+    let is_loopback_http = url.scheme() == "http"
+        && url
+            .host_str()
+            .is_some_and(|host| matches!(host, "127.0.0.1" | "localhost" | "::1"));
+    if is_loopback_http {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "embedding model URL must use HTTPS; HTTP is allowed only for loopback tests"
+        ))
+    }
 }
 
 impl VectorStore for MemoryVectorStore {
@@ -401,6 +425,19 @@ mod tests {
 
         assert!(err.to_string().contains("single safe path component"));
 
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn ensure_embedding_model_rejects_remote_plaintext_http() {
+        let dir = temp_model_dir("insecure-url");
+        let model = EmbeddingModelDownload::new("model.bin", "http://example.com/model.bin");
+
+        let err = ensure_embedding_model(&dir, &model)
+            .await
+            .expect_err("remote plaintext model URL should be rejected");
+
+        assert!(err.to_string().contains("must use HTTPS"));
         let _ = std::fs::remove_dir_all(dir);
     }
 }
