@@ -1,5 +1,5 @@
 schema_version: 2
-last_updated_utc: 2026-07-14T10:03:00Z
+last_updated_utc: 2026-07-14T10:18:00Z
 repository_head: 642487c
 branch: codex/dnz-modernisation
 
@@ -15,7 +15,7 @@ track_status:
   T03: in_progress
   T04: not_started
   T05: not_started
-  T06: in_progress
+  T06: complete
   T07: not_started
   T08: not_started
   T09: not_started
@@ -33,14 +33,16 @@ verified_gates:
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (64 unit, 8 integration, 5 property, 0 doctest failures; T06 secure model downloads)
   - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-python --all-features (PASS; 0 tests, bundled Pixi DLL paths)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (64 unit, 8 integration, 5 property, 0 doctest failures; T06 truthful schema metadata)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (65 unit, 8 integration, 5 property, 0 doctest failures; T06 export reconciliation)
+  - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS with repository .pixi Python)
 completed_tracks:
   - T00
   - T01
   - T02
+  - T06
 blocked_tracks: []
 in_progress_tracks:
   - T03
-  - T06
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
@@ -56,5 +58,5 @@ notes:
   - T02 query-contract acceptance is verified by the executable serializer/integration/property gate and is complete.
   - T03 now has record and More Like This builders, tolerant response normalization, typed common fields, integer/string IDs, unknown-field preservation, structured pagination/request metadata, and broad structured error coverage; XML/RSS parsing remains gated by verified fixtures.
   - T04-T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
-  - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, and truthful schema metadata are verified; export atomicity and manifest/file reconciliation remain.
+  - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.

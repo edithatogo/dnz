@@ -134,8 +134,9 @@ pub async fn export_gazette(
     fs::create_dir_all(&pages_dir)?;
 
     let records_path = config.output_dir.join("records.jsonl");
+    let records_temp_path = temporary_path(&records_path);
     let manifest_path = config.output_dir.join("manifest.json");
-    let mut records_writer = BufWriter::new(File::create(&records_path)?);
+    let mut records_writer = BufWriter::new(File::create(&records_temp_path)?);
 
     let mut current_page = config.start_page;
     let mut total_results = 0_u64;
@@ -188,6 +189,8 @@ pub async fn export_gazette(
         current_page += 1;
     }
     records_writer.flush()?;
+    drop(records_writer);
+    atomic_replace(&records_temp_path, &records_path)?;
 
     let manifest = GazetteExportManifest {
         collection: GAZETTE_COLLECTION.to_string(),
@@ -213,13 +216,61 @@ pub async fn export_gazette(
         },
     };
 
+    validate_manifest_files(&config.output_dir, &manifest)?;
     write_pretty_json(&manifest_path, &manifest)?;
     Ok(manifest)
 }
 
 fn write_pretty_json(path: &Path, value: &impl Serialize) -> anyhow::Result<()> {
-    let file = File::create(path)?;
-    serde_json::to_writer_pretty(file, value)?;
+    let temporary = temporary_path(path);
+    let file = File::create(&temporary)?;
+    serde_json::to_writer_pretty(&file, value)?;
+    file.sync_all()?;
+    drop(file);
+    atomic_replace(&temporary, path)?;
+    Ok(())
+}
+
+fn temporary_path(path: &Path) -> PathBuf {
+    path.with_extension(format!(
+        "{}tmp",
+        path.extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| format!("{extension}."))
+            .unwrap_or_default()
+    ))
+}
+
+fn atomic_replace(temporary: &Path, destination: &Path) -> anyhow::Result<()> {
+    if std::fs::rename(temporary, destination).is_ok() {
+        return Ok(());
+    }
+
+    if destination.exists() {
+        std::fs::remove_file(destination)?;
+        std::fs::rename(temporary, destination)?;
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "failed to publish export file {}",
+            destination.display()
+        ))
+    }
+}
+
+fn validate_manifest_files(root: &Path, manifest: &GazetteExportManifest) -> anyhow::Result<()> {
+    if manifest.files.raw_pages.len() != manifest.pages_written as usize {
+        anyhow::bail!("manifest page count does not match raw page list");
+    }
+
+    for relative in std::iter::once(manifest.files.records_jsonl.as_str())
+        .chain(manifest.files.raw_pages.iter().map(String::as_str))
+    {
+        let path = root.join(relative);
+        if !path.starts_with(root) || !path.is_file() {
+            anyhow::bail!("manifest references missing export file {relative}");
+        }
+    }
     Ok(())
 }
 
@@ -284,6 +335,47 @@ mod tests {
         assert_eq!(schema["@type"], "Dataset");
         assert_eq!(schema["size"], 0);
         assert_eq!(schema["url"], "https://example.test/empty");
+    }
+
+    #[test]
+    fn manifest_reconciliation_rejects_missing_files() {
+        let root = std::env::temp_dir().join(format!(
+            "dnz-export-reconcile-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock should be after unix epoch")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(root.join("pages")).expect("export root");
+        std::fs::write(root.join("records.jsonl"), b"{}").expect("records file");
+
+        let manifest = GazetteExportManifest {
+            collection: GAZETTE_COLLECTION.to_string(),
+            text: String::new(),
+            start_page: 1,
+            per_page: 1,
+            sort: None,
+            direction: "asc".to_string(),
+            total_results: 1,
+            pages_written: 1,
+            records_written: 1,
+            completed: true,
+            files: GazetteExportFiles {
+                records_jsonl: "records.jsonl".to_string(),
+                manifest_json: "manifest.json".to_string(),
+                raw_pages: vec!["pages/page-000001.json".to_string()],
+            },
+            access: GazetteExportAccess {
+                api_key_required: false,
+                anonymous_supported: true,
+                api_key_source: "none".to_string(),
+                note: "test".to_string(),
+            },
+        };
+
+        let error = validate_manifest_files(&root, &manifest).unwrap_err();
+        assert!(error.to_string().contains("missing export file"));
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[tokio::test]
@@ -353,6 +445,9 @@ mod tests {
             vec!["pages/page-000001.json", "pages/page-000002.json"]
         );
         assert!(output_dir.join("pages/page-000001.json").is_file());
+        assert!(!output_dir.join("records.jsonl.tmp").exists());
+        assert!(!output_dir.join("manifest.json.tmp").exists());
+        assert!(!output_dir.join("pages/page-000001.json.tmp").exists());
 
         let jsonl = std::fs::read_to_string(output_dir.join("records.jsonl")).unwrap();
         let lines: Vec<&str> = jsonl.lines().collect();
