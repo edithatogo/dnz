@@ -4,6 +4,18 @@ use dnz_core::Client;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
+use std::sync::OnceLock;
+
+static PYTHON_RUNTIME: OnceLock<Result<tokio::runtime::Runtime, String>> = OnceLock::new();
+
+fn python_runtime() -> PyResult<&'static tokio::runtime::Runtime> {
+    match PYTHON_RUNTIME
+        .get_or_init(|| tokio::runtime::Runtime::new().map_err(|error| error.to_string()))
+    {
+        Ok(runtime) => Ok(runtime),
+        Err(error) => Err(PyRuntimeError::new_err(error.clone())),
+    }
+}
 
 /// Python wrapper around the native dnz-core Client.
 #[pyclass]
@@ -94,8 +106,7 @@ impl PyQueryBuilder {
     /// Run the search query and return results as a JSON string.
     pub fn send(&self, py: Python<'_>) -> PyResult<String> {
         py.detach(|| {
-            let rt = tokio::runtime::Runtime::new()
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+            let runtime = python_runtime()?;
 
             let mut builder = self
                 .client
@@ -121,7 +132,7 @@ impl PyQueryBuilder {
             }
 
             let future = builder.send();
-            let response = rt
+            let response = runtime
                 .block_on(future)
                 .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
             let json_str = serde_json::to_string(&response)
