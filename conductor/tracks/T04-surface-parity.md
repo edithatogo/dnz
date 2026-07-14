@@ -7,6 +7,6 @@ Keep adapters thin over core. Add complete CLI flags/commands and stdout discipl
 
 Status: in_progress
 
-Evidence: conductor/evidence/2026-07-14-t04-cli-parity.md
+Evidence: conductor/evidence/2026-07-14-t04-cli-parity.md, conductor/evidence/2026-07-14-t04-mcp-parity.md
 
-Open decisions/blockers: CLI record and More Like This parity is implemented; Python, MCP, and documentation parity remain.
+Open decisions/blockers: CLI and MCP record/More Like This parity is implemented; Python and documentation parity remain.

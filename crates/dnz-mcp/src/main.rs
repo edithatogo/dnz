@@ -61,6 +61,40 @@ fn get_tools_schema() -> serde_json::Value {
                 }
             },
             {
+                "name": "get_digitalnz_record",
+                "description": "Fetch normalized metadata for one DigitalNZ record.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "string", "description": "DigitalNZ record identifier" },
+                        "fields": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "Optional metadata fields to request"
+                        }
+                    },
+                    "required": ["id"]
+                }
+            },
+            {
+                "name": "get_digitalnz_more_like_this",
+                "description": "Fetch records related to one DigitalNZ record.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "string", "description": "DigitalNZ record identifier" },
+                        "page": { "type": "number", "description": "Result page, defaults to 1" },
+                        "limit": { "type": "number", "description": "Results per page, defaults to 20 and caps at 100" },
+                        "fields": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "Optional metadata fields to request"
+                        }
+                    },
+                    "required": ["id"]
+                }
+            },
+            {
                 "name": "get_digitalnz_facets",
                 "description": "Harvest facet aggregates (counts of metadata terms like categories, partners) from DigitalNZ.",
                 "inputSchema": {
@@ -311,6 +345,56 @@ async fn handle_request(
                         ]
                     }))
                 }
+                "get_digitalnz_record" => {
+                    let id = tool_arguments
+                        .get("id")
+                        .and_then(|value| value.as_str())
+                        .ok_or_else(|| anyhow::anyhow!("Missing argument: id"))?;
+                    let fields = tool_arguments
+                        .get("fields")
+                        .map(|value| serde_json::from_value(value.clone()))
+                        .transpose()?
+                        .unwrap_or_default();
+                    let record = client.record(id).fields(fields).send().await?;
+                    Ok(serde_json::json!({
+                        "content": [{
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&record)?
+                        }]
+                    }))
+                }
+                "get_digitalnz_more_like_this" => {
+                    let id = tool_arguments
+                        .get("id")
+                        .and_then(|value| value.as_str())
+                        .ok_or_else(|| anyhow::anyhow!("Missing argument: id"))?;
+                    let page = tool_arguments
+                        .get("page")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(1) as u32;
+                    let limit = tool_arguments
+                        .get("limit")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(20) as u32;
+                    let fields = tool_arguments
+                        .get("fields")
+                        .map(|value| serde_json::from_value(value.clone()))
+                        .transpose()?
+                        .unwrap_or_default();
+                    let response = client
+                        .more_like_this(id)
+                        .page(page)
+                        .per_page(limit)
+                        .fields(fields)
+                        .send()
+                        .await?;
+                    Ok(serde_json::json!({
+                        "content": [{
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&response)?
+                        }]
+                    }))
+                }
                 _ => Err(anyhow::anyhow!("Tool not found: {}", tool_name)),
             }
         }
@@ -322,7 +406,7 @@ async fn handle_request(
 mod tests {
     use super::*;
     use serde_json::json;
-    use wiremock::matchers::{method, query_param};
+    use wiremock::matchers::{header, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn request(method: &str, params: Option<serde_json::Value>) -> JsonRpcRequest {
@@ -352,6 +436,8 @@ mod tests {
 
         assert!(tool_names.contains(&"search_digitalnz"));
         assert!(tool_names.contains(&"get_digitalnz_facets"));
+        assert!(tool_names.contains(&"get_digitalnz_record"));
+        assert!(tool_names.contains(&"get_digitalnz_more_like_this"));
         assert_eq!(
             schema["tools"][0]["inputSchema"]["required"],
             json!(["text"])
@@ -403,7 +489,8 @@ mod tests {
     async fn search_tool_calls_digitalnz_client() {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
-            .and(query_param("api_key", "test-key"))
+            .and(path("/"))
+            .and(header("Authentication-Token", "test-key"))
             .and(query_param("text", "kauri"))
             .and(query_param("page", "2"))
             .and(query_param("per_page", "5"))
@@ -454,10 +541,11 @@ mod tests {
     async fn facets_tool_calls_digitalnz_client() {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
-            .and(query_param("api_key", "test-key"))
+            .and(path("/"))
+            .and(header("Authentication-Token", "test-key"))
             .and(query_param("text", "kauri"))
             .and(query_param("page", "1"))
-            .and(query_param("per_page", "1"))
+            .and(query_param("per_page", "0"))
             .and(query_param("facets", "category,collection"))
             .and(query_param("facets_page", "2"))
             .and(query_param("facets_per_page", "3"))
@@ -500,6 +588,74 @@ mod tests {
         let text = text_content(&response);
         assert!(text.contains("\"Images\": 7"));
         assert!(text.contains("\"Museum\": 2"));
+    }
+
+    #[tokio::test]
+    async fn record_and_more_like_this_tools_call_digitalnz_client() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(wiremock::matchers::path("/records/42.json"))
+            .and(wiremock::matchers::header(
+                "Authentication-Token",
+                "test-key",
+            ))
+            .and(query_param("fields", "title,source_url"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "search": {
+                    "result_count": 1,
+                    "results": [{
+                        "id": 42,
+                        "title": "Kauri record",
+                        "source_url": "https://example.test/42"
+                    }]
+                }
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(wiremock::matchers::path("/records/42/more_like_this.json"))
+            .and(wiremock::matchers::header(
+                "Authentication-Token",
+                "test-key",
+            ))
+            .and(query_param("page", "2"))
+            .and(query_param("per_page", "3"))
+            .and(query_param("fields", "title"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "result_count": 1,
+                "records": [{"id": 99, "title": "Similar kauri record"}]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = Client::new("test-key").with_base_url(server.uri());
+        let record = handle_request(
+            &request(
+                "tools/call",
+                Some(json!({
+                    "name": "get_digitalnz_record",
+                    "arguments": {"id": "42", "fields": ["title", "source_url"]}
+                })),
+            ),
+            &client,
+        )
+        .await
+        .expect("record tool should return mocked record");
+        assert!(text_content(&record).contains("Kauri record"));
+
+        let related = handle_request(
+            &request(
+                "tools/call",
+                Some(json!({
+                    "name": "get_digitalnz_more_like_this",
+                    "arguments": {"id": "42", "page": 2, "limit": 3, "fields": ["title"]}
+                })),
+            ),
+            &client,
+        )
+        .await
+        .expect("more-like-this tool should return mocked records");
+        assert!(text_content(&related).contains("Similar kauri record"));
     }
 
     #[test]
