@@ -171,6 +171,46 @@ mod tests {
     }
 
     #[test]
+    fn canonical_query_params_encode_nested_filters_and_repeated_values() {
+        let builder = Client::unauthenticated()
+            .search("te reo & 日本語")
+            .per_page(0)
+            .try_extra_param("format", "json&csv")
+            .unwrap()
+            .try_filter(FilterExpr::all(vec![
+                FilterExpr::field("title", vec!["A&B".into(), "第二".into()]),
+                FilterExpr::any(vec![FilterExpr::field("category", vec!["Images".into()])]),
+            ]))
+            .unwrap();
+
+        let params = builder.query_params().unwrap();
+        assert!(params.contains(&("per_page".into(), "0".into())));
+        assert!(params.contains(&("and[title][]".into(), "A&B".into())));
+        assert!(params.contains(&("and[title][]".into(), "第二".into())));
+        assert!(params.contains(&("and[or][category][]".into(), "Images".into())));
+        assert!(params.contains(&("format".into(), "json&csv".into())));
+        assert!(params.windows(2).all(|pair| pair[0] <= pair[1]));
+    }
+
+    #[test]
+    fn query_contract_rejects_antimeridian_and_unsafe_extra_keys() {
+        let client = Client::unauthenticated();
+        assert!(client
+            .search("a")
+            .try_geo_bbox(10.0, 170.0, -10.0, -170.0)
+            .is_err());
+        assert!(client.search("a").try_extra_param("", "value").is_err());
+        assert!(client
+            .search("a")
+            .try_extra_param("format?x", "json")
+            .is_err());
+        assert!(client
+            .search("a")
+            .try_filter(FilterExpr::field("bad[field]", vec!["x".into()]))
+            .is_err());
+    }
+
+    #[test]
     fn test_clear_cache() {
         let client = Client::new("test");
         // Send a search (no actual HTTP call will be made with a fake API key,
@@ -447,7 +487,103 @@ pub struct QueryBuilder {
     and_filters: HashMap<String, Vec<String>>,
     or_filters: HashMap<String, Vec<String>>,
     without_filters: HashMap<String, Vec<String>>,
+    filter_exprs: Vec<FilterExpr>,
     use_cache: bool,
+}
+
+/// Boolean expression used to serialize nested DigitalNZ filters safely.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FilterExpr {
+    /// Require every child expression.
+    All(Vec<FilterExpr>),
+    /// Require at least one child expression.
+    Any(Vec<FilterExpr>),
+    /// Exclude the child expression.
+    Not(Box<FilterExpr>),
+    /// Match one or more values for a field.
+    Field { field: String, values: Vec<String> },
+}
+
+impl FilterExpr {
+    pub fn field(field: impl Into<String>, values: Vec<String>) -> Self {
+        Self::Field {
+            field: field.into(),
+            values,
+        }
+    }
+
+    pub fn all(children: Vec<Self>) -> Self {
+        Self::All(children)
+    }
+
+    pub fn any(children: Vec<Self>) -> Self {
+        Self::Any(children)
+    }
+
+    pub fn not(child: Self) -> Self {
+        Self::Not(Box::new(child))
+    }
+
+    fn validate(&self) -> anyhow::Result<()> {
+        match self {
+            Self::Field { field, .. }
+                if field.is_empty() || field.contains(['[', ']', '&', '=', '#', '?']) =>
+            {
+                anyhow::bail!("filter field is empty or contains unsafe characters")
+            }
+            Self::Field { .. } => Ok(()),
+            Self::All(children) | Self::Any(children) => {
+                if children.is_empty() {
+                    anyhow::bail!("boolean filter expression cannot be empty");
+                }
+                for child in children {
+                    child.validate()?;
+                }
+                Ok(())
+            }
+            Self::Not(child) => child.validate(),
+        }
+    }
+
+    fn append_params(&self, prefix: &[String], params: &mut Vec<(String, String)>) {
+        match self {
+            Self::Field { field, values } => {
+                let root = ["and".to_string()];
+                let prefix = if prefix.is_empty() { &root[..] } else { prefix };
+                let mut key = prefix[0].clone();
+                for component in &prefix[1..] {
+                    key.push('[');
+                    key.push_str(component);
+                    key.push(']');
+                }
+                key.push('[');
+                key.push_str(field);
+                key.push_str("][]");
+                for value in values {
+                    params.push((key.clone(), value.clone()));
+                }
+            }
+            Self::All(children) => {
+                for child in children {
+                    let mut next = prefix.to_vec();
+                    next.push("and".to_string());
+                    child.append_params(&next, params);
+                }
+            }
+            Self::Any(children) => {
+                for child in children {
+                    let mut next = prefix.to_vec();
+                    next.push("or".to_string());
+                    child.append_params(&next, params);
+                }
+            }
+            Self::Not(child) => {
+                let mut next = prefix.to_vec();
+                next.push("without".to_string());
+                child.append_params(&next, params);
+            }
+        }
+    }
 }
 
 impl QueryBuilder {
@@ -469,6 +605,7 @@ impl QueryBuilder {
             and_filters: HashMap::new(),
             or_filters: HashMap::new(),
             without_filters: HashMap::new(),
+            filter_exprs: Vec::new(),
             use_cache: true,
         }
     }
@@ -528,7 +665,10 @@ impl QueryBuilder {
         value: impl Into<String>,
     ) -> anyhow::Result<Self> {
         let key = key.into();
-        if is_protected_extra_param(&key) || key.contains('&') || key.contains('=') {
+        if key.is_empty()
+            || is_protected_extra_param(&key)
+            || key.contains(['&', '=', '#', '?', '[', ']'])
+        {
             anyhow::bail!("extra parameter is protected or unsafe: {key}");
         }
         self.extra_params.push((key, value.into()));
@@ -556,6 +696,7 @@ impl QueryBuilder {
             || !(-180.0..=180.0).contains(&w)
             || !(-180.0..=180.0).contains(&e)
             || n < s
+            || w > e
         {
             anyhow::bail!("invalid geographic bounding box");
         }
@@ -580,13 +721,15 @@ impl QueryBuilder {
         self
     }
 
-    /// Execute the query asynchronously and return parsed search results.
-    pub async fn send(self) -> anyhow::Result<SearchResponse> {
-        if !self.client.base_url.starts_with("https://")
-            && !is_local_test_url(&self.client.base_url)
-        {
-            return Err(anyhow::anyhow!("DigitalNZ base URL must use HTTPS"));
-        }
+    /// Add a validated nested boolean filter expression.
+    pub fn try_filter(mut self, filter: FilterExpr) -> anyhow::Result<Self> {
+        filter.validate()?;
+        self.filter_exprs.push(filter);
+        Ok(self)
+    }
+
+    /// Build the canonical, repeated query parameter representation.
+    pub fn query_params(&self) -> anyhow::Result<Vec<(String, String)>> {
         let mut query_params = vec![
             ("text".to_string(), self.text.clone()),
             ("page".to_string(), self.page.to_string()),
@@ -596,11 +739,9 @@ impl QueryBuilder {
         if self.client.legacy_query_key_auth && !self.client.api_key.is_empty() {
             query_params.push(("api_key".to_string(), self.client.api_key.clone()));
         }
-
         if !self.fields.is_empty() {
             query_params.push(("fields".to_string(), self.fields.join(",")));
         }
-
         if !self.facets.is_empty() {
             query_params.push(("facets".to_string(), self.facets.join(",")));
             query_params.push(("facets_page".to_string(), self.facets_page.to_string()));
@@ -615,39 +756,46 @@ impl QueryBuilder {
                 ));
             }
         }
-
         query_params.extend(self.extra_params.iter().cloned());
-
         if let (Some(sort), Some(dir)) = (self.sort.clone(), self.direction.clone()) {
             query_params.push(("sort".to_string(), sort));
             query_params.push(("direction".to_string(), dir));
         }
-
         if let Some(bbox) = self.geo_bbox {
-            let bbox_str = format!("{},{},{},{}", bbox[0], bbox[1], bbox[2], bbox[3]);
-            query_params.push(("geo_bbox".to_string(), bbox_str));
+            query_params.push((
+                "geo_bbox".to_string(),
+                format!("{},{},{},{}", bbox[0], bbox[1], bbox[2], bbox[3]),
+            ));
         }
-
-        // Handle AND filters (e.g. and[content_partner][]=value)
-        for (field, values) in &self.and_filters {
-            for val in values {
-                query_params.push((format!("and[{}][]", field), val.clone()));
+        for (prefix, filters) in [
+            ("and", &self.and_filters),
+            ("or", &self.or_filters),
+            ("without", &self.without_filters),
+        ] {
+            let mut entries: Vec<_> = filters.iter().collect();
+            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+            for (field, values) in entries {
+                for value in values {
+                    query_params.push((format!("{prefix}[{field}][]"), value.clone()));
+                }
             }
         }
-
-        // Handle OR filters (e.g. or[category][]=value)
-        for (field, values) in &self.or_filters {
-            for val in values {
-                query_params.push((format!("or[{}][]", field), val.clone()));
-            }
+        for filter in &self.filter_exprs {
+            filter.validate()?;
+            filter.append_params(&[], &mut query_params);
         }
+        query_params.sort();
+        Ok(query_params)
+    }
 
-        // Handle WITHOUT filters (e.g. without[category][]=value)
-        for (field, values) in &self.without_filters {
-            for val in values {
-                query_params.push((format!("without[{}][]", field), val.clone()));
-            }
+    /// Execute the query asynchronously and return parsed search results.
+    pub async fn send(self) -> anyhow::Result<SearchResponse> {
+        if !self.client.base_url.starts_with("https://")
+            && !is_local_test_url(&self.client.base_url)
+        {
+            return Err(anyhow::anyhow!("DigitalNZ base URL must use HTTPS"));
         }
+        let query_params = self.query_params()?;
 
         // Generate cache key
         let cache_key = self.cache_key(&query_params);
