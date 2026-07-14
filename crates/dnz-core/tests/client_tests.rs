@@ -150,7 +150,10 @@ async fn http_errors_are_structured_and_secret_safe() {
     assert_eq!(structured.status(), Some(404));
     // Retry-After is bounded by the client contract, so the deliberately
     // excessive fixture value is preserved at the 60-second safety cap.
-    assert_eq!(structured.retry_after(), Some(std::time::Duration::from_secs(60)));
+    assert_eq!(
+        structured.retry_after(),
+        Some(std::time::Duration::from_secs(60))
+    );
     assert!(!error
         .to_string()
         .contains("private-token-should-not-escape"));
