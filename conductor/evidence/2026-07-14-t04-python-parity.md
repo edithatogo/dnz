@@ -4,6 +4,7 @@ Implemented:
 
 - Added Python builders for `record()` and `more_like_this()` over `dnz-core`.
 - Added field selection, pagination, and `send()`/`send_raw()` normalized JSON result methods.
+- Added `send_typed()` methods that decode normalized JSON into native Python dictionaries/lists.
 - Registered both builders in the PyO3 module and documented the usage alongside CLI parity.
 
 Verification:
@@ -16,4 +17,4 @@ cargo fmt --all -- --check
 
 Pass: Python adapter compilation and Clippy with warnings denied; formatting check passed.
 
-Remaining T04 work is limited to richer typed Python facade objects and broader public API documentation.
+Remaining T04 work is limited to optional async ergonomics and broader public API documentation.

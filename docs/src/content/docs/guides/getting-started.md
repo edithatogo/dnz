@@ -59,7 +59,8 @@ Gazette exports apply `primary_collection=New Zealand Gazette` automatically. Th
 ## Using the Python bindings
 
 The Maturin-built `dnz` module exposes the same core builders. `send()` and
-`send_raw()` return normalized JSON strings, while unknown provider fields are
+`send_raw()` return normalized JSON strings; `send_typed()` decodes the same
+result into native Python dictionaries/lists. Unknown provider fields are
 preserved by the Rust core:
 
 ```python
@@ -69,6 +70,7 @@ client = PyClient("your-api-key")
 record = client.record("37757055")
 record.fields(["title", "source_url"])
 record_json = record.send_raw()
+record_dict = record.send_typed()
 
 related = client.more_like_this("37757055")
 related.page(2)

@@ -9,4 +9,4 @@ Status: in_progress
 
 Evidence: conductor/evidence/2026-07-14-t04-cli-parity.md, conductor/evidence/2026-07-14-t04-mcp-parity.md, conductor/evidence/2026-07-14-t04-python-parity.md
 
-Open decisions/blockers: CLI, MCP, and Python builder parity is implemented; richer typed Python facade objects and broader documentation remain.
+Open decisions/blockers: CLI, MCP, and Python raw/typed builder parity is implemented; optional async ergonomics and broader documentation remain.

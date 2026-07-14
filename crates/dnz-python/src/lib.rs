@@ -165,6 +165,12 @@ impl PyQueryBuilder {
     pub fn send_raw(&self, py: Python<'_>) -> PyResult<String> {
         self.send(py)
     }
+
+    /// Return the normalized response as native Python dictionaries/lists.
+    pub fn send_typed(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let raw = self.send(py)?;
+        Ok(py.import("json")?.call_method1("loads", (raw,))?.unbind())
+    }
 }
 
 /// Python wrapper for record metadata lookup.
@@ -202,6 +208,12 @@ impl PyRecordBuilder {
     /// Return the normalized record using the raw JSON adapter contract.
     pub fn send_raw(&self, py: Python<'_>) -> PyResult<String> {
         self.send(py)
+    }
+
+    /// Return the normalized record as a native Python dictionary.
+    pub fn send_typed(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let raw = self.send(py)?;
+        Ok(py.import("json")?.call_method1("loads", (raw,))?.unbind())
     }
 }
 
@@ -254,6 +266,12 @@ impl PyMoreLikeThisBuilder {
     /// Return the normalized response using the raw JSON adapter contract.
     pub fn send_raw(&self, py: Python<'_>) -> PyResult<String> {
         self.send(py)
+    }
+
+    /// Return the normalized response as native Python dictionaries/lists.
+    pub fn send_typed(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let raw = self.send(py)?;
+        Ok(py.import("json")?.call_method1("loads", (raw,))?.unbind())
     }
 }
 
