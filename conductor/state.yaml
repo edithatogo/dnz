@@ -1,5 +1,5 @@
 schema_version: 2
-last_updated_utc: 2026-07-14T09:27:00Z
+last_updated_utc: 2026-07-14T09:39:00Z
 repository_head: 496a6e0
 branch: codex/dnz-modernisation
 
@@ -30,6 +30,7 @@ verified_gates:
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (61 unit, 8 integration, 5 property, 0 doctest failures)
   - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS with repository .pixi Python)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (63 unit, 8 integration, 5 property, 0 doctest failures; T06 vector semantics)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (64 unit, 8 integration, 5 property, 0 doctest failures; T06 secure model downloads)
 completed_tracks:
   - T00
   - T01
@@ -53,5 +54,5 @@ notes:
   - T02 query-contract acceptance is verified by the executable serializer/integration/property gate and is complete.
   - T03 now has record and More Like This builders, tolerant response normalization, typed common fields, integer/string IDs, unknown-field preservation, structured pagination/request metadata, and broad structured error coverage; XML/RSS parsing remains gated by verified fixtures.
   - T04-T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
-  - T06 dense harvest truncation was removed; vector-store dimension/upsert semantics are verified; export, secure model-download, and Python runtime items remain.
+  - T06 dense harvest truncation was removed; vector-store dimension/upsert and secure model-download semantics are verified; export and Python runtime items remain.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.
