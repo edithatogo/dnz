@@ -15,11 +15,20 @@ pub struct SearchResponse {
 pub struct SearchMetadata {
     /// Total number of records matching query.
     pub result_count: u64,
+    /// One-based page number returned by the provider, when supplied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<u32>,
+    /// Requested page size returned by the provider, when supplied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub per_page: Option<u32>,
     /// List of records in current page.
     pub results: Vec<Record>,
     /// Optional dictionary of facets returned.
     #[serde(default)]
     pub facets: HashMap<String, HashMap<String, u64>>,
+    /// Request metadata returned by the provider, preserved without guessing its shape.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request: Option<serde_json::Value>,
 }
 
 /// A single heritage record from DigitalNZ.
@@ -188,12 +197,29 @@ pub fn normalize_search_response(value: serde_json::Value) -> anyhow::Result<Sea
                 let result_count = object
                     .remove("result_count")
                     .and_then(|value| value.as_u64())
-                    .unwrap_or_else(|| results.len() as u64);
+                    .unwrap_or(results.len() as u64);
+                let page = object
+                    .remove("page")
+                    .and_then(|value| value.as_u64())
+                    .and_then(|value| u32::try_from(value).ok());
+                let per_page = object
+                    .remove("per_page")
+                    .and_then(|value| value.as_u64())
+                    .and_then(|value| u32::try_from(value).ok());
+                let facets = object
+                    .remove("facets")
+                    .map(serde_json::from_value)
+                    .transpose()?
+                    .unwrap_or_default();
+                let request = object.remove("request");
                 return Ok(SearchResponse {
                     search: SearchMetadata {
                         result_count,
+                        page,
+                        per_page,
                         results,
-                        facets: HashMap::new(),
+                        facets,
+                        request,
                     },
                 });
             }
@@ -204,8 +230,11 @@ pub fn normalize_search_response(value: serde_json::Value) -> anyhow::Result<Sea
         serde_json::Value::Array(records) => Ok(SearchResponse {
             search: SearchMetadata {
                 result_count: records.len() as u64,
+                page: None,
+                per_page: None,
                 results: serde_json::from_value(serde_json::Value::Array(records))?,
                 facets: HashMap::new(),
+                request: None,
             },
         }),
         _ => Err(anyhow::anyhow!("search response is not an object or array")),
@@ -350,13 +379,45 @@ mod tests {
     fn normalize_search_response_accepts_flat_records() {
         let response = normalize_search_response(serde_json::json!({
             "result_count": 2,
+            "page": 3,
+            "per_page": 25,
+            "facets": {"category": {"Images": 2}},
+            "request": {"sort": "date"},
             "records": [{"id": 1, "title": "One"}, {"id": "2", "title": "Two"}]
         }))
         .unwrap();
 
         assert_eq!(response.search.result_count, 2);
+        assert_eq!(response.search.page, Some(3));
+        assert_eq!(response.search.per_page, Some(25));
+        assert_eq!(response.search.facets["category"]["Images"], 2);
+        assert_eq!(
+            response.search.request,
+            Some(serde_json::json!({"sort": "date"}))
+        );
         assert_eq!(response.search.results[0].id, "1");
         assert_eq!(response.search.results[1].id, "2");
+    }
+
+    #[test]
+    fn normalize_search_response_preserves_envelope_metadata() {
+        let response = normalize_search_response(serde_json::json!({
+            "search": {
+                "result_count": 1,
+                "page": 2,
+                "per_page": 10,
+                "request": {"text": "harbour"},
+                "results": [{"id": "1", "title": "Harbour"}]
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(response.search.page, Some(2));
+        assert_eq!(response.search.per_page, Some(10));
+        assert_eq!(
+            response.search.request,
+            Some(serde_json::json!({"text": "harbour"}))
+        );
     }
 
     #[test]

@@ -131,12 +131,15 @@ mod tests {
         SearchResponse {
             search: SearchMetadata {
                 result_count: 1,
+                page: None,
+                per_page: None,
                 results: vec![Record {
                     id: "rec-1".to_string(),
                     title: title.to_string(),
                     ..Record::default()
                 }],
                 facets: Default::default(),
+                request: None,
             },
         }
     }
