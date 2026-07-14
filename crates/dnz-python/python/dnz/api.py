@@ -114,6 +114,8 @@ def _apply_builder_options(builder, options):
         builder.sort(options["sort"], options.get("direction", "asc"))
     if options.get("geo_bbox") is not None:
         builder.geo_bbox(list(options["geo_bbox"]))
+    for key, value in (options.get("extra_params") or {}).items():
+        builder.extra_param(key, str(value))
     for kind, method in (("_and", "and_filter"), ("_or", "or_filter"), ("_without", "without_filter")):
         for field, values in (options.get(kind) or {}).items():
             getattr(builder, method)(field, list(values))

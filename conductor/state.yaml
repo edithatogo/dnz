@@ -23,6 +23,8 @@ track_status:
 
 verified_gates:
   - cargo fmt --all -- --check
+  - rustup run stable-x86_64-pc-windows-gnu cargo check -p dnz-python --all-features (PASS; T05 packaged facade/native bridge)
+  - .pixi/envs/default/python.exe -m unittest discover -s crates/dnz-python/python/tests -v (3 tests passed; T05 clean-room compatibility)
   - cargo metadata --no-deps --format-version 1
   - scripts/workspace-doctor.ps1 (GNU route, 50.39 GB free)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (57 unit, 4 integration, 5 property, 0 doctest failures)
