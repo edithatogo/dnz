@@ -137,14 +137,36 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 #[derive(Default, Debug, Clone)]
 pub struct MemoryVectorStore {
     vectors: Vec<DocumentVector>,
+    dimension: Option<usize>,
 }
 
 impl VectorStore for MemoryVectorStore {
     fn insert(&mut self, record_id: &str, embedding: &[f32]) -> anyhow::Result<()> {
-        self.vectors.push(DocumentVector {
+        if let Some(dimension) = self.dimension {
+            if dimension != embedding.len() {
+                return Err(anyhow::anyhow!(
+                    "embedding dimension {} does not match store dimension {}",
+                    embedding.len(),
+                    dimension
+                ));
+            }
+        } else {
+            self.dimension = Some(embedding.len());
+        }
+
+        let vector = DocumentVector {
             record_id: record_id.to_string(),
             embedding: embedding.to_vec(),
-        });
+        };
+        if let Some(existing) = self
+            .vectors
+            .iter_mut()
+            .find(|candidate| candidate.record_id == record_id)
+        {
+            *existing = vector;
+        } else {
+            self.vectors.push(vector);
+        }
         Ok(())
     }
 
@@ -264,6 +286,26 @@ mod tests {
         let emb = store.get("rec_1").unwrap().unwrap();
         assert_eq!(emb, vec![1.0, 0.0, 0.0]);
         assert!(store.get("nonexistent").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_memory_store_upserts_existing_record_id() {
+        let mut store = MemoryVectorStore::default();
+        store.insert("rec_1", &[1.0, 0.0]).unwrap();
+        store.insert("rec_1", &[0.0, 1.0]).unwrap();
+
+        assert_eq!(store.get("rec_1").unwrap(), Some(vec![0.0, 1.0]));
+        assert_eq!(store.query_similarity(&[0.0, 1.0], 10).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_memory_store_rejects_dimension_changes() {
+        let mut store = MemoryVectorStore::default();
+        store.insert("rec_1", &[1.0, 0.0]).unwrap();
+
+        let error = store.insert("rec_2", &[1.0, 0.0, 0.0]).unwrap_err();
+        assert!(error.to_string().contains("embedding dimension 3"));
+        assert!(store.get("rec_2").unwrap().is_none());
     }
 
     #[test]
