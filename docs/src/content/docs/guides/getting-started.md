@@ -78,6 +78,11 @@ related.per_page(5)
 related_json = related.send()
 ```
 
+Compatibility notes: the modern bindings use Python 3, HTTPS, structured
+errors, and safe `extra_params`; credentials are not placed in request URLs.
+The historical raw `wild` URL-fragment escape hatch is intentionally not
+supported.
+
 ---
 
 ## Starting the MCP Server (`dnz-mcp`)

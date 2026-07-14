@@ -1,11 +1,11 @@
 schema_version: 2
-last_updated_utc: 2026-07-14T10:04:29Z
+last_updated_utc: 2026-07-14T10:19:00Z
 repository_head: 8125d7d
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
-active_track: T04
-active_slice: cli-record-and-mlt-parity
+active_track: T05
+active_slice: clean-room-dnz-api-facade
 status: in_progress
 
 track_status:
@@ -13,8 +13,8 @@ track_status:
   T01: complete
   T02: complete
   T03: in_progress
-  T04: in_progress
-  T05: not_started
+  T04: complete
+  T05: in_progress
   T06: complete
   T07: not_started
   T08: not_started
@@ -46,11 +46,12 @@ completed_tracks:
   - T00
   - T01
   - T02
+  - T04
   - T06
 blocked_tracks: []
 in_progress_tracks:
   - T03
-  - T04
+  - T05
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
@@ -60,6 +61,7 @@ latest_evidence:
   - conductor/evidence/2026-07-14-t04-cli-parity.md
   - conductor/evidence/2026-07-14-t04-mcp-parity.md
   - conductor/evidence/2026-07-14-t04-python-parity.md
+  - conductor/evidence/2026-07-14-t05-pydnz-compatibility.md
 latest_handoff: conductor/handoff.md
 notes:
   - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
@@ -68,7 +70,8 @@ notes:
   - T01 transport/auth/cache/error acceptance is verified by the executable core gate and is complete.
   - T02 query-contract acceptance is verified by the executable serializer/integration/property gate and is complete.
   - T03 now has record and More Like This builders, tolerant JSON/XML response normalization, typed common fields, integer/string IDs, unknown-field preservation, structured pagination/request metadata, and broad structured error coverage; RSS parsing remains gated by a stable upstream fixture.
-  - T04 CLI, MCP, and Python raw/typed record/More Like This builder parity is verified; optional async ergonomics and broader documentation remain.
-  - T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
+  - T04 CLI, MCP, and Python raw/typed record/More Like This builder parity and migration notes are verified; optional async ergonomics is deferred.
+  - T05 clean-room dnz.api facade is implemented over the native Rust extension; broader behavioral and wheel import tests remain.
+  - T05 is in progress; T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
   - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.

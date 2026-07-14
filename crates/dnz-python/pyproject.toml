@@ -2,6 +2,10 @@
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
+[tool.maturin]
+module-name = "dnz._native"
+python-source = "python"
+
 [project]
 name = "dnz"
 version = "0.1.0"
