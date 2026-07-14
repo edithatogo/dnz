@@ -45,6 +45,7 @@ impl PyClient {
             facets_page: None,
             facets_per_page: None,
             geo_bbox: None,
+            extra_params: Vec::new(),
             sort: None,
             direction: None,
             and_filters: HashMap::new(),
@@ -86,6 +87,7 @@ pub struct PyQueryBuilder {
     facets_page: Option<u32>,
     facets_per_page: Option<u32>,
     geo_bbox: Option<[f64; 4]>,
+    extra_params: Vec<(String, String)>,
     sort: Option<String>,
     direction: Option<String>,
     and_filters: HashMap<String, Vec<String>>,
@@ -134,6 +136,15 @@ impl PyQueryBuilder {
         Ok(())
     }
 
+    /// Add one validated, non-sensitive query parameter.
+    pub fn extra_param(&mut self, key: String, value: String) -> PyResult<()> {
+        if key == "api_key" || key == "key" || key == "wild" {
+            return Err(PyValueError::new_err("protected extra parameter"));
+        }
+        self.extra_params.push((key, value));
+        Ok(())
+    }
+
     /// Sort by field and direction.
     pub fn sort(&mut self, field: String, direction: String) {
         self.sort = Some(field);
@@ -178,6 +189,11 @@ impl PyQueryBuilder {
             }
             if let Some([north, west, south, east]) = self.geo_bbox {
                 builder = builder.geo_bbox(north, west, south, east);
+            }
+            for (key, value) in &self.extra_params {
+                builder = builder
+                    .try_extra_param(key.clone(), value.clone())
+                    .map_err(|error| PyValueError::new_err(error.to_string()))?;
             }
 
             if let (Some(s), Some(d)) = (self.sort.clone(), self.direction.clone()) {
