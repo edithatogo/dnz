@@ -1,7 +1,7 @@
 //! PyO3 FFI wrapper exposing dnz-core client to Python.
 
 use dnz_core::Client;
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -41,6 +41,10 @@ impl PyClient {
             page: 1,
             per_page: 20,
             fields: Vec::new(),
+            facets: Vec::new(),
+            facets_page: None,
+            facets_per_page: None,
+            geo_bbox: None,
             sort: None,
             direction: None,
             and_filters: HashMap::new(),
@@ -78,6 +82,10 @@ pub struct PyQueryBuilder {
     page: u32,
     per_page: u32,
     fields: Vec<String>,
+    facets: Vec<String>,
+    facets_page: Option<u32>,
+    facets_per_page: Option<u32>,
+    geo_bbox: Option<[f64; 4]>,
     sort: Option<String>,
     direction: Option<String>,
     and_filters: HashMap<String, Vec<String>>,
@@ -100,6 +108,30 @@ impl PyQueryBuilder {
     /// Restrict the fields returned in the result records.
     pub fn fields(&mut self, fields: Vec<String>) {
         self.fields = fields;
+    }
+
+    /// Request facet aggregates for the selected fields.
+    pub fn facets(&mut self, facets: Vec<String>) {
+        self.facets = facets;
+    }
+
+    /// Set the facet page index.
+    pub fn facets_page(&mut self, page: u32) {
+        self.facets_page = Some(page);
+    }
+
+    /// Set the facet page size.
+    pub fn facets_per_page(&mut self, per_page: u32) {
+        self.facets_per_page = Some(per_page);
+    }
+
+    /// Set a north, west, south, east geographic bounding box.
+    pub fn geo_bbox(&mut self, bbox: Vec<f64>) -> PyResult<()> {
+        let values: [f64; 4] = bbox
+            .try_into()
+            .map_err(|_| PyValueError::new_err("geo_bbox should contain exactly four values"))?;
+        self.geo_bbox = Some(values);
+        Ok(())
     }
 
     /// Sort by field and direction.
@@ -134,6 +166,19 @@ impl PyQueryBuilder {
                 .page(self.page)
                 .per_page(self.per_page)
                 .fields(self.fields.clone());
+
+            for facet in &self.facets {
+                builder = builder.facet(facet.clone());
+            }
+            if let Some(page) = self.facets_page {
+                builder = builder.facets_page(page);
+            }
+            if let Some(per_page) = self.facets_per_page {
+                builder = builder.facets_per_page(per_page);
+            }
+            if let Some([north, west, south, east]) = self.geo_bbox {
+                builder = builder.geo_bbox(north, west, south, east);
+            }
 
             if let (Some(s), Some(d)) = (self.sort.clone(), self.direction.clone()) {
                 builder = builder.sort(s, d);
@@ -277,7 +322,7 @@ impl PyMoreLikeThisBuilder {
 
 /// The dnz python module definition.
 #[pymodule]
-fn dnz(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyClient>()?;
     m.add_class::<PyQueryBuilder>()?;
     m.add_class::<PyRecordBuilder>()?;
