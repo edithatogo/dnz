@@ -48,7 +48,6 @@ pub fn generate_schema_ld(records: &[Record], base_uri: &str) -> serde_json::Val
         "name": "DigitalNZ Harvest Collection",
         "description": "Harvested archives representing digital heritage collections from libraries and museums in New Zealand.",
         "url": base_uri,
-        "license": "https://creativecommons.org/publicdomain/zero/1.0/",
         "distribution": [
             {
                 "@type": "DataDownload",
@@ -57,7 +56,6 @@ pub fn generate_schema_ld(records: &[Record], base_uri: &str) -> serde_json::Val
             }
         ],
         "size": records.len(),
-        "temporalCoverage": "1800/2026"
     })
 }
 
@@ -266,6 +264,8 @@ mod tests {
             "https://example.test/dnz/records.csv"
         );
         assert_eq!(schema["size"], 1);
+        assert!(schema.get("license").is_none());
+        assert!(schema.get("temporalCoverage").is_none());
     }
 
     #[test]
