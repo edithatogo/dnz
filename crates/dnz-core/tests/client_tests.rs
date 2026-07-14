@@ -47,6 +47,39 @@ async fn test_mock_search_request() {
 }
 
 #[tokio::test]
+async fn xml_search_and_record_endpoints_use_verified_normalization() {
+    let mock_server = MockServer::start().await;
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<search><page type="integer">1</page><per-page type="integer">1</per-page>
+<result-count type="integer">1</result-count><results type="array">
+<result><id type="integer">42</id><title>XML item</title><subject>one</subject><subject>two</subject></result>
+</results><facets type="array"/></search>"#;
+
+    Mock::given(method("GET"))
+        .and(path("/records.xml"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(xml))
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/records/42.xml"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(xml))
+        .mount(&mock_server)
+        .await;
+
+    let base_url = format!("{}/records.xml", mock_server.uri());
+    let client = Client::unauthenticated().with_base_url(base_url);
+    let response = client.search("xml").send().await.unwrap();
+    assert_eq!(response.search.results[0].id, "42");
+    assert_eq!(
+        response.search.results[0].subject.as_ref().unwrap().len(),
+        2
+    );
+
+    let record = client.record("42").send().await.unwrap();
+    assert_eq!(record.title, "XML item");
+}
+
+#[tokio::test]
 async fn test_mock_search_facets_and_sorting() {
     let mock_server = MockServer::start().await;
 
