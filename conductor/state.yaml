@@ -1,6 +1,6 @@
 schema_version: 2
-last_updated_utc: 2026-07-14T09:06:00Z
-repository_head: 01131fe
+last_updated_utc: 2026-07-14T09:18:00Z
+repository_head: 132a867
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
@@ -27,6 +27,8 @@ verified_gates:
   - scripts/workspace-doctor.ps1 (GNU route, 50.39 GB free)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (57 unit, 4 integration, 5 property, 0 doctest failures)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (60 unit, 8 integration, 5 property, 0 doctest failures)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (61 unit, 8 integration, 5 property, 0 doctest failures)
+  - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS with repository .pixi Python)
 completed_tracks:
   - T00
   - T01
@@ -48,7 +50,7 @@ notes:
   - The legacy tracks.md is now a compatibility index and must not contain independent track statuses.
   - T01 transport/auth/cache/error acceptance is verified by the executable core gate and is complete.
   - T02 query-contract acceptance is verified by the executable serializer/integration/property gate and is complete.
-  - T03 now has record and More Like This builders, tolerant response normalization, typed common fields, integer/string IDs, unknown-field preservation, and broad structured error coverage; XML/RSS parsing remains gated by verified fixtures.
+  - T03 now has record and More Like This builders, tolerant response normalization, typed common fields, integer/string IDs, unknown-field preservation, structured pagination/request metadata, and broad structured error coverage; XML/RSS parsing remains gated by verified fixtures.
   - T04-T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
   - T06 dense harvest truncation was removed in an earlier slice; export/vector/Python correctness items remain.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.

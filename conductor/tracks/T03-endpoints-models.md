@@ -9,4 +9,4 @@ Status: in_progress
 
 Evidence: conductor/evidence/2026-07-14-t03-endpoints-models.md
 
-Open decisions/blockers: XML/RSS parsing remains gated by verified fixture evidence; broader structured error-shape coverage remains.
+Open decisions/blockers: XML/RSS parsing remains gated by verified fixture evidence. JSON endpoint error-shape coverage is complete for the current builders.

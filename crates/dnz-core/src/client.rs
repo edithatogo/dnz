@@ -664,6 +664,7 @@ impl FilterExpr {
         Self::Any(children)
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn not(child: Self) -> Self {
         Self::Not(Box::new(child))
     }
@@ -917,7 +918,7 @@ impl QueryBuilder {
             ("without", &self.without_filters),
         ] {
             let mut entries: Vec<_> = filters.iter().collect();
-            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+            entries.sort_by_key(|(left, _)| (*left).clone());
             for (field, values) in entries {
                 for value in values {
                     query_params.push((format!("{prefix}[{field}][]"), value.clone()));
@@ -1090,10 +1091,8 @@ fn record_endpoint_url(base_url: &str, record_id: &str) -> anyhow::Result<String
         .unwrap_or_else(|| "json".to_string());
     if segments
         .last()
-        .is_some_and(|segment| segment.starts_with("records."))
+        .is_some_and(|segment| segment.starts_with("records.") || segment == "records")
     {
-        segments.pop();
-    } else if segments.last().is_some_and(|segment| segment == "records") {
         segments.pop();
     }
     segments.push("records".to_string());
