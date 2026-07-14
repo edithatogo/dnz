@@ -9,4 +9,4 @@ Status: in_progress
 
 Evidence: conductor/evidence/2026-07-13-t01-t06-slice.md
 
-Open decisions/blockers: Remaining export/vector/Python correctness items remain. Dense harvest partition truncation at 1,000 records is removed in the current slice.
+Open decisions/blockers: Remaining export, vector-download, and Python runtime correctness items remain. Dense harvest partition truncation at 1,000 records is removed, and vector-store dimension/upsert semantics are now verified.

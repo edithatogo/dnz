@@ -1,5 +1,5 @@
 schema_version: 2
-last_updated_utc: 2026-07-14T09:18:00Z
+last_updated_utc: 2026-07-14T09:27:00Z
 repository_head: 445e28a
 branch: codex/dnz-modernisation
 
@@ -29,6 +29,7 @@ verified_gates:
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (60 unit, 8 integration, 5 property, 0 doctest failures)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (61 unit, 8 integration, 5 property, 0 doctest failures)
   - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS with repository .pixi Python)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (63 unit, 8 integration, 5 property, 0 doctest failures; T06 vector semantics)
 completed_tracks:
   - T00
   - T01
@@ -43,6 +44,7 @@ latest_evidence:
   - conductor/evidence/2026-07-13-t01-t06-slice.md
   - conductor/evidence/2026-07-14-t01-t02-executable-gate.md
   - conductor/evidence/2026-07-14-t03-endpoints-models.md
+  - conductor/evidence/2026-07-13-t01-t06-slice.md
 latest_handoff: conductor/handoff.md
 notes:
   - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
@@ -52,5 +54,5 @@ notes:
   - T02 query-contract acceptance is verified by the executable serializer/integration/property gate and is complete.
   - T03 now has record and More Like This builders, tolerant response normalization, typed common fields, integer/string IDs, unknown-field preservation, structured pagination/request metadata, and broad structured error coverage; XML/RSS parsing remains gated by verified fixtures.
   - T04-T05 and T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
-  - T06 dense harvest truncation was removed in an earlier slice; export/vector/Python correctness items remain.
+  - T06 dense harvest truncation was removed; vector-store dimension/upsert semantics are verified; export, secure model-download, and Python runtime items remain.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.
