@@ -1,11 +1,11 @@
 schema_version: 2
-last_updated_utc: 2026-07-15T17:00:00Z
-repository_head: 2ecf99d
+last_updated_utc: 2026-07-15T14:51:10Z
+repository_head: e7e3a2e
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
-active_track: T09
-active_slice: evidence-pack-citations
+active_track: T10
+active_slice: contract-drift-and-hardening-gates
 status: in_progress
 
 track_status:
@@ -18,8 +18,8 @@ track_status:
   T06: complete
   T07: complete
   T08: complete
-  T09: in_progress
-  T10: not_started
+  T09: complete
+  T10: in_progress
 
 verified_gates:
   - cargo fmt --all -- --check
@@ -50,6 +50,11 @@ verified_gates:
   - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T09 evidence pack and research indexes)
   - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core evidence::tests:: (PASS; T09 CSL and Markdown evidence outputs)
   - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core research::tests:: (PASS; T09 lexical/vector/hybrid provenance)
+  - bundled Pixi Python scripts/check_openapi_drift.py (PASS; T10 offline contract report)
+  - bundled Pixi Python scripts/verify-release-archives.py (PASS; T10 required files and SHA-256 manifest)
+  - bundled Pixi Python scripts/create-release-archive.py plus ZIP inspection (PASS; T10 archive contents)
+  - pwsh scripts/live-digitalnz-smoke.ps1 (PASS; intentional non-live skip without -RunLive)
+  - bundled PyYAML workflow parsing for ci.yml, hardening.yml, and release.yml (PASS; T10 workflow syntax)
   - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T07 incremental sync manifest)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-mcp --all-features (7 tests passed; T04 MCP record/MLT parity)
   - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS after T04 MCP parity)
@@ -73,9 +78,11 @@ completed_tracks:
   - T05
   - T06
   - T07
+  - T08
+  - T09
 blocked_tracks: []
 in_progress_tracks:
-  - T09
+  - T10
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
@@ -89,6 +96,7 @@ latest_evidence:
   - conductor/evidence/2026-07-15-t07-page-stream.md
   - conductor/evidence/2026-07-15-t08-export-jsonl.md
   - conductor/evidence/2026-07-15-t09-evidence-pack.md
+  - conductor/evidence/2026-07-16-t10-hardening.md
 latest_handoff: conductor/handoff.md
 notes:
   - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
@@ -101,6 +109,7 @@ notes:
   - T05 clean-room dnz.api facade, compatibility tests, GNU wheel build, and isolated wheel import verification are complete; broader optional behavioral combinations remain future hardening.
   - T07 bounded page/record streams, cache lifecycle, resumable/rate-controlled harvest, recursive density planning, and deterministic incremental sync manifests are verified; T07 is complete.
   - T08 deterministic atomic JSONL, CSV, validated GeoJSON, optional Parquet, SQLite, provenance/checksum metadata, data-quality metrics, rights/reuse audits, and source-grounded Frictionless/schema.org/RO-Crate metadata are verified and complete.
-  - T09 evidence packs now preserve source links, rights metadata, stable citation keys, CSL-compatible references, Markdown output, and explicit API-MLT/lexical/local-vector/hybrid provenance; end-to-end consumer integration remains.
+  - T09 evidence packs preserve source links, rights metadata, stable citation keys, CSL-compatible references, Markdown output, and explicit API-MLT/lexical/local-vector/hybrid provenance; T09 is complete.
+  - T10 hardening scripts and workflows are implemented; hosted GitHub execution remains required evidence before T10 closeout.
   - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.

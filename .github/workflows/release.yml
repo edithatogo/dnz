@@ -37,6 +37,11 @@ jobs:
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Set up Python for archive verification
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Cache Cargo Dependencies
         uses: swatinem/rust-cache@v2
 
@@ -62,6 +67,19 @@ jobs:
             target/release/${{ matrix.mcp_asset_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create verified release archive
+        shell: bash
+        run: |
+          python scripts/create-release-archive.py \
+            --archive "dist/dnz-${{ matrix.os }}.zip" \
+            --files "target/release/${{ matrix.asset_name }}" "target/release/${{ matrix.mcp_asset_name }}"
+
+      - name: Upload verified release archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: dnz-release-${{ matrix.os }}
+          path: dist/dnz-${{ matrix.os }}.zip
 
   publish-cargo:
     name: Package crates.io dry-runs

@@ -5,8 +5,8 @@ Create provenance-rich evidence packs, CSL-compatible citation data or accuratel
 
 ## Completion record
 
-Status: in_progress
+Status: complete
 
 Evidence: conductor/evidence/2026-07-15-t09-evidence-pack.md
 
-Open decisions/blockers: none recorded; end-to-end consumer integration remains.
+Open decisions/blockers: none for the scoped T09 acceptance criteria.
