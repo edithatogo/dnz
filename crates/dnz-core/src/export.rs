@@ -523,7 +523,7 @@ fn write_pretty_json(path: &Path, value: &impl Serialize) -> anyhow::Result<()> 
     Ok(())
 }
 
-fn temporary_path(path: &Path) -> PathBuf {
+pub(crate) fn temporary_path(path: &Path) -> PathBuf {
     path.with_extension(format!(
         "{}tmp",
         path.extension()
@@ -533,7 +533,7 @@ fn temporary_path(path: &Path) -> PathBuf {
     ))
 }
 
-fn atomic_replace(temporary: &Path, destination: &Path) -> anyhow::Result<()> {
+pub(crate) fn atomic_replace(temporary: &Path, destination: &Path) -> anyhow::Result<()> {
     if std::fs::rename(temporary, destination).is_ok() {
         return Ok(());
     }

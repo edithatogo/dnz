@@ -2,7 +2,7 @@
 
 ## Compatibility policy
 
-- The documented MSRV is Rust 1.75, matching the Pixi environment contract. A release must pass the MSRV check in CI or record a deliberate policy update here before publication.
+- The documented MSRV is Rust 1.84, matching the Arrow/Parquet dependency floor and the Pixi environment contract. The hardening workflow runs a workspace check at this floor before publication.
 - Public Rust, Python, CLI, and MCP behavior follows SemVer. Breaking changes require a major version; compatible additions and bug fixes use minor/patch releases as appropriate.
 - Deprecations remain documented for at least one minor release, include a replacement, and are removed only at a planned major release.
 - Provider contract changes are recorded in `conductor/contracts/` with fixture-backed tests and explicit live-validation status.

@@ -9,4 +9,4 @@ Status: in_progress
 
 Evidence: conductor/evidence/2026-07-16-t10-hardening.md
 
-Open decisions/blockers: hosted workflow execution remains required evidence. The audit job also remains red on two high advisories in Polars 0.54.4's transitive object_store 0.13.2 / quick-xml 0.39.4 path; direct advisories are fixed and no available Polars release resolves the upstream dependency yet.
+Open decisions/blockers: hosted workflow execution remains required evidence. Local audit is green after the optional export dependency was narrowed to polars-core plus Arrow/Parquet; one allowed unmaintained paste warning remains explicitly reported.

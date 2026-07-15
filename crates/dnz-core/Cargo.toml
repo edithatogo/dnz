@@ -2,6 +2,7 @@
 name = "dnz-core"
 version = "0.1.0"
 edition = "2021"
+rust-version.workspace = true
 description = "Core client library wrapper for DigitalNZ API"
 license = "MIT"
 repository = "https://github.com/edithatogo/dnz"
@@ -12,8 +13,8 @@ categories = ["api-bindings"]
 
 [features]
 default = ["dataframe"]
-dataframe = ["dep:polars"]
-parquet = ["dataframe", "polars/parquet"]
+dataframe = ["dep:polars-core"]
+parquet = ["dataframe", "dep:parquet", "dep:arrow-array", "dep:arrow-schema"]
 
 [dependencies]
 tokio = { workspace = true }
@@ -25,7 +26,10 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 nutype = { workspace = true }
-polars = { workspace = true, optional = true }
+polars-core = { workspace = true, optional = true }
+parquet = { workspace = true, optional = true }
+arrow-array = { workspace = true, optional = true }
+arrow-schema = { workspace = true, optional = true }
 rand = { workspace = true }
 rusqlite = { workspace = true }
 
