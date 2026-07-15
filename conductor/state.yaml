@@ -1,6 +1,6 @@
 schema_version: 2
-last_updated_utc: 2026-07-16T07:35:00Z
-repository_head: 95a18f4
+last_updated_utc: 2026-07-16T09:00:00Z
+repository_head: 0430762
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
@@ -78,7 +78,7 @@ verified_gates:
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (64 unit, 8 integration, 5 property, 0 doctest failures; T06 truthful schema metadata)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (65 unit, 8 integration, 5 property, 0 doctest failures; T06 export reconciliation)
   - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS with repository .pixi Python)
-  - GitHub Actions hardening run 29445121454 (PASS; Rust workspace, MSRV 1.94, OpenAPI, container, package, cargo audit/deny, Gitleaks, and SPDX SBOM; live smoke intentionally skipped)
+  - GitHub Actions hardening run 29449278829 (PASS; Rust workspace including GeoParquet tests/bench, MSRV 1.94, OpenAPI, container, package, cargo audit/deny, Gitleaks, and SPDX SBOM; live smoke intentionally skipped)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features parquet (PASS; 3 Parquet/GeoParquet tests including WKB metadata and invalid-coordinate omission)
   - cargo +stable-x86_64-pc-windows-gnu clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS after GeoParquet implementation)
 completed_tracks:
