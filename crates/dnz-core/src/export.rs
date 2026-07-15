@@ -27,6 +27,58 @@ pub fn write_records_jsonl(path: impl AsRef<Path>, records: &[Record]) -> anyhow
     atomic_replace(&temporary, path)
 }
 
+/// Write a stable, spreadsheet-safe CSV projection of normalized records.
+///
+/// The projection is intentionally explicit; unknown provider fields remain
+/// available through JSONL. Formula-like leading characters are prefixed so
+/// common spreadsheet consumers do not interpret metadata as executable data.
+pub fn write_records_csv(path: impl AsRef<Path>, records: &[Record]) -> anyhow::Result<()> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temporary = temporary_path(path);
+    let mut writer = BufWriter::new(File::create(&temporary)?);
+    writer.write_all(b"id,title,description,content_partner,category,source_url,usage\n")?;
+    for record in records {
+        let fields = [
+            record.id.as_str(),
+            record.title.as_str(),
+            record.description.as_deref().unwrap_or_default(),
+            &join_values(record.content_partner.as_deref()),
+            &join_values(record.category.as_deref()),
+            record.source_url.as_deref().unwrap_or_default(),
+            record.usage.as_deref().unwrap_or_default(),
+        ];
+        for (index, field) in fields.iter().enumerate() {
+            if index > 0 {
+                writer.write_all(b",")?;
+            }
+            writer.write_all(csv_field(field).as_bytes())?;
+        }
+        writer.write_all(b"\n")?;
+    }
+    writer.flush()?;
+    drop(writer);
+    atomic_replace(&temporary, path)
+}
+
+fn join_values(values: Option<&[String]>) -> String {
+    values.map(|values| values.join(" | ")).unwrap_or_default()
+}
+
+fn csv_field(value: &str) -> String {
+    let safe = match value.chars().next() {
+        Some('=') | Some('+') | Some('-') | Some('@') => format!("'{value}"),
+        _ => value.to_string(),
+    };
+    if safe.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", safe.replace('"', "\"\""))
+    } else {
+        safe
+    }
+}
+
 /// Generate a Frictionless Data Package descriptor (datapackage.json) for record sets.
 pub fn generate_frictionless_datapackage(
     records: &[Record],
@@ -325,6 +377,29 @@ mod tests {
         write_records_jsonl(&output, &records()).unwrap();
         assert_eq!(first, std::fs::read_to_string(&output).unwrap());
         assert!(!output.with_extension("jsonl.tmp").exists());
+        let _ = std::fs::remove_file(output);
+    }
+
+    #[test]
+    fn records_csv_escapes_fields_and_blocks_formula_values() {
+        let output = std::env::temp_dir().join(format!(
+            "dnz-records-{}-{}.csv",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let records = vec![Record {
+            id: "=unsafe".to_string(),
+            title: "Title, with \"quotes\"".to_string(),
+            ..Record::default()
+        }];
+        write_records_csv(&output, &records).unwrap();
+        let csv = std::fs::read_to_string(&output).unwrap();
+        assert!(csv.contains("'=unsafe"));
+        assert!(csv.contains("\"Title, with \"\"quotes\"\"\""));
+        assert!(!output.with_extension("csv.tmp").exists());
         let _ = std::fs::remove_file(output);
     }
 
