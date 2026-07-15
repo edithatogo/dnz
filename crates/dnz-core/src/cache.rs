@@ -52,18 +52,34 @@ impl PersistentCache {
 
     /// Read a cached search response.
     pub fn get(&self, cache_key: &str) -> anyhow::Result<Option<SearchResponse>> {
+        self.get_with_max_age(cache_key, None)
+    }
+
+    /// Read a cached response, optionally rejecting entries older than `max_age`.
+    pub fn get_with_max_age(
+        &self,
+        cache_key: &str,
+        max_age: Option<std::time::Duration>,
+    ) -> anyhow::Result<Option<SearchResponse>> {
         let conn = self.open()?;
-        let response_json = conn
+        let cached = conn
             .query_row(
-                "SELECT response_json FROM search_cache WHERE cache_key = ?1",
+                "SELECT response_json, created_at FROM search_cache WHERE cache_key = ?1",
                 params![cache_key],
-                |row| row.get::<_, String>(0),
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
             )
             .optional()?;
 
-        response_json
-            .map(|json| serde_json::from_str(&json).map_err(Into::into))
-            .transpose()
+        let Some((response_json, created_at)) = cached else {
+            return Ok(None);
+        };
+        if let Some(max_age) = max_age {
+            let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64;
+            if max_age.is_zero() || now.saturating_sub(created_at) > max_age.as_secs() as i64 {
+                return Ok(None);
+            }
+        }
+        Ok(Some(serde_json::from_str(&response_json)?))
     }
 
     /// Store a search response.
@@ -186,6 +202,22 @@ mod tests {
 
         assert!(cache
             .get("query-key")
+            .expect("get should succeed")
+            .is_none());
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn persistent_cache_ttl_rejects_expired_entries() {
+        let path = temp_cache_path("ttl");
+        let cache = PersistentCache::new(&path).expect("cache should initialize");
+        cache
+            .put("query-key", &sample_response("Kauri"))
+            .expect("put should succeed");
+
+        assert!(cache
+            .get_with_max_age("query-key", Some(std::time::Duration::ZERO))
             .expect("get should succeed")
             .is_none());
 
