@@ -8,6 +8,7 @@ pub mod client;
 pub mod dataframe;
 pub mod digest;
 pub mod errors;
+pub mod evidence;
 pub mod export;
 pub mod models;
 #[cfg(feature = "parquet")]
@@ -32,6 +33,9 @@ pub use digest::generate_chronological_timeline;
 pub use digest::generate_citations;
 pub use digest::to_rag_xml;
 pub use errors::DnzError;
+pub use evidence::{
+    build_evidence_pack, write_evidence_pack, EvidenceItem, EvidencePack, SearchProvenance,
+};
 pub use export::export_gazette;
 pub use export::generate_frictionless_datapackage;
 pub use export::generate_schema_ld;
