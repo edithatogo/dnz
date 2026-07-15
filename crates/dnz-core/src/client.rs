@@ -1,6 +1,6 @@
 //! Client and query builder implementations for the DigitalNZ API.
 
-use crate::cache::PersistentCache;
+use crate::cache::{CacheProvenance, PersistentCache};
 use crate::errors::DnzError;
 use crate::models::{
     normalize_record_response, normalize_rss_record_response, normalize_rss_search_response,
@@ -27,6 +27,7 @@ pub struct Client {
     cache: Arc<Mutex<HashMap<String, SearchResponse>>>,
     persistent_cache: Option<PersistentCache>,
     cache_ttl: Option<Duration>,
+    cache_max_entries: Option<usize>,
     offline: bool,
 }
 
@@ -44,6 +45,7 @@ impl Client {
             cache: Arc::new(Mutex::new(HashMap::new())),
             persistent_cache: None,
             cache_ttl: None,
+            cache_max_entries: None,
             offline: false,
         }
     }
@@ -97,6 +99,12 @@ impl Client {
     /// Reject persistent cache entries older than `ttl`.
     pub fn with_cache_ttl(mut self, ttl: Duration) -> Self {
         self.cache_ttl = Some(ttl);
+        self
+    }
+
+    /// Bound persistent cache growth by retaining only the newest entries.
+    pub fn with_cache_max_entries(mut self, max_entries: usize) -> Self {
+        self.cache_max_entries = Some(max_entries);
         self
     }
 
@@ -1148,8 +1156,17 @@ impl QueryBuilder {
                 c.insert(cache_key.clone(), response.clone());
             }
             if let Some(cache) = &self.client.persistent_cache {
-                if let Err(err) = cache.put(&cache_key, &response) {
+                let provenance = CacheProvenance {
+                    source_url: self.client.base_url.clone(),
+                    auth_namespace: self.client.auth_cache_namespace(),
+                };
+                if let Err(err) = cache.put_with_provenance(&cache_key, &response, &provenance) {
                     warn!(error = ?err, "Failed to write persistent cache");
+                }
+                if let Some(limit) = self.client.cache_max_entries {
+                    if let Err(err) = cache.prune_to_limit(limit) {
+                        warn!(error = ?err, "Failed to enforce persistent cache limit");
+                    }
                 }
             }
         }

@@ -9,4 +9,4 @@ Status: in_progress
 
 Evidence: conductor/evidence/2026-07-15-t07-page-stream.md
 
-Open decisions/blockers: cache eviction/provenance and harvest/sync slices remain.
+Open decisions/blockers: harvest/sync slices remain.
