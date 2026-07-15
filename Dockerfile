@@ -1,4 +1,4 @@
-FROM rust:1.88-bookworm AS build
+FROM rust:1.94-bookworm AS build
 WORKDIR /src
 COPY . .
 RUN cargo build --release -p dnz-cli

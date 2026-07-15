@@ -7,7 +7,7 @@ channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64"]
 
 [dependencies]
-rust = ">=1.84"
+rust = ">=1.94"
 python = ">=3.12,<3.13"
 maturin = ">=1.0,<2"
 cargo-mutants = ">=24.0.0"
