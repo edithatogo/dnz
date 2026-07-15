@@ -1,5 +1,5 @@
 schema_version: 2
-last_updated_utc: 2026-07-15T13:00:00Z
+last_updated_utc: 2026-07-15T14:00:00Z
 repository_head: 0b9f5ac
 branch: codex/dnz-modernisation
 
@@ -36,10 +36,11 @@ verified_gates:
   - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS with repository .pixi Python)
   - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --all-features (72 unit, 11 integration, 5 property, 0 doctest failures; T07 cache and harvest slices)
   - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T07 harvest checkpoints)
-  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --all-features (79 unit, 12 integration, 5 property, 0 doctest failures; T08 exports and provenance)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --all-features (79 unit, 12 integration, 5 property, 0 doctest failures; T08 exports, provenance, quality, and rights)
   - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T08 CSV export)
   - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T08 GeoJSON export)
   - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T08 provenance)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T08 quality and rights)
   - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T07 incremental sync manifest)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-mcp --all-features (7 tests passed; T04 MCP record/MLT parity)
   - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS after T04 MCP parity)
@@ -89,6 +90,6 @@ notes:
   - T04 CLI, MCP, and Python raw/typed record/More Like This builder parity and migration notes are verified; optional async ergonomics is deferred.
   - T05 clean-room dnz.api facade, compatibility tests, GNU wheel build, and isolated wheel import verification are complete; broader optional behavioral combinations remain future hardening.
   - T07 bounded page/record streams, cache lifecycle, resumable/rate-controlled harvest, recursive density planning, and deterministic incremental sync manifests are verified; T07 is complete.
-  - T08 deterministic atomic JSONL, CSV, validated GeoJSON, and provenance/checksum metadata are verified; broader quality/rights slices remain.
+  - T08 deterministic atomic JSONL, CSV, validated GeoJSON, provenance/checksum metadata, data-quality metrics, and rights/reuse audits are verified; broader packaging remains.
   - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.
