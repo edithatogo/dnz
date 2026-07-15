@@ -5,6 +5,42 @@ use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
+async fn bounded_search_page_stream_fetches_on_demand() {
+    let mock_server = MockServer::start().await;
+    for (page, id) in [(1, "one"), (2, "two")] {
+        Mock::given(method("GET"))
+            .and(query_param("text", "kiwi"))
+            .and(query_param("page", page.to_string()))
+            .and(query_param("per_page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "search": {
+                    "result_count": 2,
+                    "results": [{"id": id, "title": id}],
+                    "facets": {}
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+    }
+
+    let mut pages = Client::unauthenticated()
+        .with_base_url(mock_server.uri())
+        .search_pages("kiwi")
+        .per_page(1)
+        .max_pages(2);
+
+    assert_eq!(
+        pages.next_page().await.unwrap().unwrap().search.results[0].id,
+        "one"
+    );
+    assert_eq!(
+        pages.next_page().await.unwrap().unwrap().search.results[0].id,
+        "two"
+    );
+    assert!(pages.next_page().await.unwrap().is_none());
+}
+
+#[tokio::test]
 async fn test_mock_search_request() {
     let mock_server = MockServer::start().await;
 

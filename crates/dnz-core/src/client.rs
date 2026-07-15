@@ -107,6 +107,21 @@ impl Client {
         QueryBuilder::new(self.clone(), text.into())
     }
 
+    /// Create a bounded, caller-driven stream of search pages.
+    ///
+    /// Pages are fetched only when [`SearchPageStream::next_page`] is called,
+    /// so callers control backpressure and can cancel by dropping the stream.
+    pub fn search_pages(&self, text: impl Into<String>) -> SearchPageStream {
+        SearchPageStream {
+            client: self.clone(),
+            text: text.into(),
+            next_page: 1,
+            per_page: 20,
+            max_pages: None,
+            finished: false,
+        }
+    }
+
     /// Create a record-by-ID metadata builder.
     pub fn record(&self, record_id: impl Into<String>) -> RecordQueryBuilder {
         RecordQueryBuilder {
@@ -126,6 +141,53 @@ impl Client {
             fields: Vec::new(),
             filters: Vec::new(),
         }
+    }
+}
+
+/// Lazy page stream for bounded search harvesting.
+#[derive(Debug, Clone)]
+pub struct SearchPageStream {
+    client: Client,
+    text: String,
+    next_page: u32,
+    per_page: u32,
+    max_pages: Option<u32>,
+    finished: bool,
+}
+
+impl SearchPageStream {
+    /// Set the requested page size, clamped to the API maximum.
+    pub fn per_page(mut self, per_page: u32) -> Self {
+        self.per_page = per_page.min(100);
+        self
+    }
+
+    /// Set a hard upper bound on the number of pages fetched.
+    pub fn max_pages(mut self, max_pages: u32) -> Self {
+        self.max_pages = Some(max_pages);
+        self
+    }
+
+    /// Fetch the next page, returning `None` when the configured limit or the
+    /// provider's empty page marks the stream complete.
+    pub async fn next_page(&mut self) -> anyhow::Result<Option<SearchResponse>> {
+        if self.finished || self.max_pages.is_some_and(|limit| self.next_page > limit) {
+            self.finished = true;
+            return Ok(None);
+        }
+
+        let response = self
+            .client
+            .search(&self.text)
+            .page(self.next_page)
+            .per_page(self.per_page)
+            .send()
+            .await?;
+        self.next_page = self.next_page.saturating_add(1);
+        if response.search.results.is_empty() {
+            self.finished = true;
+        }
+        Ok(Some(response))
     }
 }
 
