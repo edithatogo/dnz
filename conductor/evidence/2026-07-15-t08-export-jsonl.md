@@ -60,3 +60,6 @@
 ## T08 closeout
 
 T08 export surfaces and source-grounded packaging are implemented and locally verified: JSONL, CSV, GeoJSON, optional Parquet, SQLite, Frictionless, schema.org, RO-Crate, checksums/provenance, data-quality metrics, and rights/reuse summaries. Rights and completeness outputs remain metadata audits with explicit caveats, not legal determinations or provider-completeness claims.
+- Optional GeoParquet export is now implemented alongside generic Arrow/Parquet. It emits only finite WGS84 points, stores little-endian WKB geometry, and writes GeoParquet 1.1 `geo` schema metadata with read-back coverage.
+- `cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features parquet` — PASS; 3 Parquet/GeoParquet artifact tests, including metadata and invalid-coordinate omission.
+- `cargo +stable-x86_64-pc-windows-gnu clippy -p dnz-core --all-targets --all-features -- -D warnings` — PASS after GeoParquet implementation.

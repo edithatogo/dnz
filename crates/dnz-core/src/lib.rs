@@ -58,7 +58,7 @@ pub use models::normalize_search_response;
 pub use models::normalize_xml_record_response;
 pub use models::normalize_xml_search_response;
 #[cfg(feature = "parquet")]
-pub use parquet::write_records_parquet;
+pub use parquet::{write_records_geoparquet, write_records_parquet};
 pub use quality::{assess_data_quality, audit_rights_reuse, DataQualityReport, RightsReuseAudit};
 pub use research::{hybrid_search, vector_search, LexicalIndex, ResearchHit};
 pub use sync::{
