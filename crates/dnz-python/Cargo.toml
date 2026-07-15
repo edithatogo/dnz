@@ -2,6 +2,7 @@
 name = "dnz-python"
 version = "0.1.0"
 edition = "2021"
+rust-version.workspace = true
 description = "Python FFI bindings for DigitalNZ integration using PyO3"
 license = "MIT"
 repository = "https://github.com/edithatogo/dnz"

@@ -36,6 +36,16 @@ jobs:
       - run: cargo test --workspace --all-features
       - run: cargo bench -p dnz-core --bench benchmarks
 
+  msrv:
+    name: MSRV workspace check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.84
+      - run: cargo check --workspace --all-features
+
   adapters-and-packages:
     name: Python, MCP, and package metadata checks
     runs-on: ubuntu-latest

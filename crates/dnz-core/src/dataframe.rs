@@ -1,7 +1,7 @@
 //! Polars DataFrame integration for DigitalNZ heritage records.
 
 use crate::models::Record;
-use polars::prelude::*;
+use polars_core::prelude::*;
 
 /// Extension trait to convert lists of Records directly to Polars DataFrames.
 pub trait IntoDataFrame {

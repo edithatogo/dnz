@@ -45,7 +45,8 @@
 
 ## Parquet/Arrow slice
 
-- Added an explicit `parquet` feature over the existing dataframe adapter; the feature enables Polars Parquet support without changing the default Rust API surface.
+- Added an explicit `parquet` feature over the existing dataframe adapter; DataFrames use `polars-core` and Parquet uses the Arrow writer directly, avoiding the full Polars I/O/cloud dependency surface.
+- Parquet output is atomically published and verified by reading the emitted artifact back through the Arrow Parquet reader, including replacement of an existing destination.
 - Added `write_records_parquet` and a non-empty-artifact test. JSONL remains the lossless provider-field-preserving interchange format.
 - `cargo check -p dnz-core --features parquet` — PASS.
 - `cargo test -p dnz-core --features parquet parquet::tests::` — PASS (1 focused test; integration/property binaries clean under the filter).
