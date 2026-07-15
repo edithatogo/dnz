@@ -37,9 +37,15 @@
 - Both reports explicitly state that they summarize supplied metadata only and are not legal advice or determinations of reuse permission.
 - Targeted quality tests pass; Clippy with warnings denied passes.
 
+## Source-grounded packaging slice
+
+- Added RO-Crate 1.1 metadata generation linking the dataset, JSONL distribution, supplied source endpoint, and DigitalNZ publisher identity.
+- The package description explicitly limits rights and completeness claims to metadata requiring source-specific review.
+- Targeted RO-Crate test passes; formatting and Clippy remain clean.
+
 ## Remaining T08 work
 
-Parquet/Arrow and broader source-grounded metadata packaging remain.
+Parquet/Arrow remains; source-grounded Frictionless/schema.org/RO-Crate coverage is now implemented for the current export surfaces.
 
 ## Remaining T08 work
 

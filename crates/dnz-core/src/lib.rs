@@ -38,7 +38,9 @@ pub use export::write_records_geojson;
 pub use export::write_records_jsonl;
 pub use export::GazetteExportConfig;
 pub use export::GazetteExportManifest;
-pub use export::{build_export_provenance, write_export_provenance, ExportProvenance};
+pub use export::{
+    build_export_provenance, generate_ro_crate_metadata, write_export_provenance, ExportProvenance,
+};
 pub use models::normalize_record_response;
 pub use models::normalize_rss_record_response;
 pub use models::normalize_rss_search_response;
