@@ -3,7 +3,7 @@
 use crate::client::Client;
 use crate::models::Record;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 use tracing::{info, warn};
@@ -14,6 +14,53 @@ pub struct HarvestOptions {
     pub max_parallel_partitions: usize,
     pub request_delay: Duration,
     pub checkpoint_path: Option<PathBuf>,
+}
+
+/// One deterministic facet-density partition produced by the planner.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DensityPartition {
+    pub values: Vec<String>,
+    pub estimated_count: u64,
+    pub indivisible: bool,
+}
+
+/// Recursively split sorted facet buckets until each partition is below the
+/// requested density, preserving oversized singleton buckets as explicit
+/// limitations rather than discarding or truncating them.
+pub fn plan_density_partitions(
+    facet_counts: &BTreeMap<String, u64>,
+    max_records_per_partition: u64,
+) -> Vec<DensityPartition> {
+    let limit = max_records_per_partition.max(1);
+    let entries: Vec<_> = facet_counts
+        .iter()
+        .map(|(value, count)| (value.clone(), *count))
+        .collect();
+    let mut partitions = Vec::new();
+    split_density_partition(&entries, limit, &mut partitions);
+    partitions
+}
+
+fn split_density_partition(
+    entries: &[(String, u64)],
+    limit: u64,
+    output: &mut Vec<DensityPartition>,
+) {
+    if entries.is_empty() {
+        return;
+    }
+    let total = entries.iter().map(|(_, count)| *count).sum::<u64>();
+    if total <= limit || entries.len() == 1 {
+        output.push(DensityPartition {
+            values: entries.iter().map(|(value, _)| value.clone()).collect(),
+            estimated_count: total,
+            indivisible: entries.len() == 1 && total > limit,
+        });
+        return;
+    }
+    let midpoint = entries.len() / 2;
+    split_density_partition(&entries[..midpoint], limit, output);
+    split_density_partition(&entries[midpoint..], limit, output);
 }
 
 impl Default for HarvestOptions {
@@ -217,8 +264,25 @@ fn write_checkpoint(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
     use wiremock::matchers::{method, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[test]
+    fn density_planner_splits_deterministically_and_flags_oversized_singletons() {
+        let facets = BTreeMap::from([
+            ("1900".to_string(), 7),
+            ("1901".to_string(), 7),
+            ("1902".to_string(), 30),
+        ]);
+        let partitions = plan_density_partitions(&facets, 10);
+
+        assert_eq!(partitions[0].values, vec!["1900"]);
+        assert_eq!(partitions[1].values, vec!["1901"]);
+        assert_eq!(partitions[2].values, vec!["1902"]);
+        assert!(partitions[2].indivisible);
+        assert_eq!(partitions[2].estimated_count, 30);
+    }
 
     #[tokio::test]
     async fn harvest_deep_returns_empty_when_year_facets_are_absent() {
