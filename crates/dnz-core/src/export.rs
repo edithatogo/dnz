@@ -212,7 +212,7 @@ pub fn write_records_sqlite(path: impl AsRef<Path>, records: &[Record]) -> anyho
     atomic_replace(&temporary, path)
 }
 
-fn find_coordinates(value: &serde_json::Value) -> Option<(f64, f64)> {
+pub(crate) fn find_coordinates(value: &serde_json::Value) -> Option<(f64, f64)> {
     match value {
         serde_json::Value::Object(object) => {
             let latitude = ["latitude", "lat"]
