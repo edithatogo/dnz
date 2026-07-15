@@ -1,11 +1,11 @@
 schema_version: 2
-last_updated_utc: 2026-07-15T05:00:00Z
+last_updated_utc: 2026-07-15T06:00:00Z
 repository_head: 38a690c
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
-active_track: T05
-active_slice: clean-room-dnz-api-facade
+active_track: T07
+active_slice: bounded-lazy-page-stream
 status: in_progress
 
 track_status:
@@ -16,7 +16,7 @@ track_status:
   T04: complete
   T05: complete
   T06: complete
-  T07: not_started
+  T07: in_progress
   T08: not_started
   T09: not_started
   T10: not_started
@@ -34,6 +34,7 @@ verified_gates:
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (60 unit, 8 integration, 5 property, 0 doctest failures)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (61 unit, 8 integration, 5 property, 0 doctest failures)
   - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS with repository .pixi Python)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --all-features (69 unit, 11 integration, 5 property, 0 doctest failures; T07 bounded page stream)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-mcp --all-features (7 tests passed; T04 MCP record/MLT parity)
   - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS after T04 MCP parity)
   - rustup run stable-x86_64-pc-windows-gnu cargo check -p dnz-python --all-features (PASS; T04 Python record/MLT parity)
@@ -56,7 +57,8 @@ completed_tracks:
   - T05
   - T06
 blocked_tracks: []
-in_progress_tracks: []
+in_progress_tracks:
+  - T07
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
@@ -67,6 +69,7 @@ latest_evidence:
   - conductor/evidence/2026-07-14-t04-mcp-parity.md
   - conductor/evidence/2026-07-14-t04-python-parity.md
   - conductor/evidence/2026-07-14-t05-pydnz-compatibility.md
+  - conductor/evidence/2026-07-15-t07-page-stream.md
 latest_handoff: conductor/handoff.md
 notes:
   - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
@@ -77,6 +80,6 @@ notes:
   - T03 record/MLT builders, tolerant JSON/XML/RSS response normalization, typed common fields, integer/string IDs, unknown-field preservation, structured pagination/request metadata, and broad structured error coverage are verified; live RSS HTTP 500 is an external follow-up.
   - T04 CLI, MCP, and Python raw/typed record/More Like This builder parity and migration notes are verified; optional async ergonomics is deferred.
   - T05 clean-room dnz.api facade, compatibility tests, GNU wheel build, and isolated wheel import verification are complete; broader optional behavioral combinations remain future hardening.
-  - T05 is in progress; T07-T10 have seeded definitions and GitHub issue mirrors but no completed implementation evidence.
+  - T07 bounded lazy page stream is verified; cache lifecycle, harvest planning, and incremental sync remain.
   - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.

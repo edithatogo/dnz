@@ -19,6 +19,7 @@ pub use client::FilterExpr;
 pub use client::MoreLikeThisQueryBuilder;
 pub use client::QueryBuilder;
 pub use client::RecordQueryBuilder;
+pub use client::SearchPageStream;
 #[cfg(feature = "dataframe")]
 pub use dataframe::IntoDataFrame;
 pub use digest::deduplicate_records;
