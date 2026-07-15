@@ -12,6 +12,16 @@
 - Full core gate — PASS (76 unit, 12 integration, 5 property, 0 doctest failures).
 - Clippy with warnings denied — PASS.
 
+## CSV slice
+
+- Added `write_records_csv` with an explicit stable schema, RFC-style quoting, deterministic row order, and formula-like value neutralization for spreadsheet safety.
+- JSONL remains the lossless export path for unknown provider fields; CSV is an intentional tabular projection.
+- Full core gate after this slice: 77 unit, 12 integration, 5 property, 0 doctest failures; Clippy passes with warnings denied.
+
+## Remaining T08 work
+
+Parquet/Arrow, validated geospatial output, checksums/schema/provenance expansion, data-quality metrics, and rights/reuse summaries remain.
+
 ## Remaining T08 work
 
 CSV/Parquet or Arrow export, validated geospatial formats, checksums/schema/provenance expansion, data-quality metrics, and rights/reuse summaries remain.

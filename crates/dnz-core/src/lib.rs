@@ -32,6 +32,7 @@ pub use errors::DnzError;
 pub use export::export_gazette;
 pub use export::generate_frictionless_datapackage;
 pub use export::generate_schema_ld;
+pub use export::write_records_csv;
 pub use export::write_records_jsonl;
 pub use export::GazetteExportConfig;
 pub use export::GazetteExportManifest;
