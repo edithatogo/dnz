@@ -10,6 +10,23 @@ use std::path::{Path, PathBuf};
 
 const GAZETTE_COLLECTION: &str = "New Zealand Gazette";
 
+/// Write normalized records as deterministic JSONL using an atomic publish.
+pub fn write_records_jsonl(path: impl AsRef<Path>, records: &[Record]) -> anyhow::Result<()> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temporary = temporary_path(path);
+    let mut writer = BufWriter::new(File::create(&temporary)?);
+    for record in records {
+        serde_json::to_writer(&mut writer, record)?;
+        writer.write_all(b"\n")?;
+    }
+    writer.flush()?;
+    drop(writer);
+    atomic_replace(&temporary, path)
+}
+
 /// Generate a Frictionless Data Package descriptor (datapackage.json) for record sets.
 pub fn generate_frictionless_datapackage(
     records: &[Record],
@@ -291,6 +308,24 @@ mod tests {
             title: "Kauri".to_string(),
             ..Record::default()
         }]
+    }
+
+    #[test]
+    fn records_jsonl_is_deterministic_and_atomic() {
+        let output = std::env::temp_dir().join(format!(
+            "dnz-records-{}-{}.jsonl",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        write_records_jsonl(&output, &records()).unwrap();
+        let first = std::fs::read_to_string(&output).unwrap();
+        write_records_jsonl(&output, &records()).unwrap();
+        assert_eq!(first, std::fs::read_to_string(&output).unwrap());
+        assert!(!output.with_extension("jsonl.tmp").exists());
+        let _ = std::fs::remove_file(output);
     }
 
     #[test]

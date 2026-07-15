@@ -13,13 +13,14 @@ pub mod models;
 pub mod sync;
 pub mod vector;
 
-pub use autopilot::{Autopilot, HarvestOptions};
+pub use autopilot::{plan_density_partitions, Autopilot, DensityPartition, HarvestOptions};
 pub use cache::{CacheEntry, CacheProvenance, PersistentCache};
 pub use client::Client;
 pub use client::FilterExpr;
 pub use client::MoreLikeThisQueryBuilder;
 pub use client::QueryBuilder;
 pub use client::RecordQueryBuilder;
+pub use client::RecordStream;
 pub use client::SearchPageStream;
 #[cfg(feature = "dataframe")]
 pub use dataframe::IntoDataFrame;
@@ -31,6 +32,7 @@ pub use errors::DnzError;
 pub use export::export_gazette;
 pub use export::generate_frictionless_datapackage;
 pub use export::generate_schema_ld;
+pub use export::write_records_jsonl;
 pub use export::GazetteExportConfig;
 pub use export::GazetteExportManifest;
 pub use models::normalize_record_response;

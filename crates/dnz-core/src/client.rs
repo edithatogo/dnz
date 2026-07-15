@@ -146,6 +146,16 @@ impl Client {
         }
     }
 
+    /// Create a lazy record stream backed by bounded page requests.
+    pub fn records(&self, text: impl Into<String>) -> RecordStream {
+        RecordStream {
+            pages: self.search_pages(text),
+            current: Vec::new(),
+            max_records: None,
+            emitted: 0,
+        }
+    }
+
     /// Create a record-by-ID metadata builder.
     pub fn record(&self, record_id: impl Into<String>) -> RecordQueryBuilder {
         RecordQueryBuilder {
@@ -212,6 +222,47 @@ impl SearchPageStream {
             self.finished = true;
         }
         Ok(Some(response))
+    }
+}
+
+/// Lazy record stream that applies backpressure at individual record reads.
+#[derive(Debug, Clone)]
+pub struct RecordStream {
+    pages: SearchPageStream,
+    current: Vec<Record>,
+    max_records: Option<u32>,
+    emitted: u32,
+}
+
+impl RecordStream {
+    /// Set a hard upper bound on records yielded by this stream.
+    pub fn max_records(mut self, max_records: u32) -> Self {
+        self.max_records = Some(max_records);
+        self
+    }
+
+    /// Set the page size used by the underlying lazy page stream.
+    pub fn per_page(mut self, per_page: u32) -> Self {
+        self.pages = self.pages.per_page(per_page);
+        self
+    }
+
+    /// Fetch and yield one record, returning `None` at the configured limit or end.
+    pub async fn next_record(&mut self) -> anyhow::Result<Option<Record>> {
+        if self.max_records.is_some_and(|limit| self.emitted >= limit) {
+            return Ok(None);
+        }
+        loop {
+            if let Some(record) = self.current.pop() {
+                self.emitted = self.emitted.saturating_add(1);
+                return Ok(Some(record));
+            }
+            let Some(page) = self.pages.next_page().await? else {
+                return Ok(None);
+            };
+            self.current = page.search.results;
+            self.current.reverse();
+        }
     }
 }
 
