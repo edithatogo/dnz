@@ -14,6 +14,7 @@ pub mod models;
 #[cfg(feature = "parquet")]
 pub mod parquet;
 pub mod quality;
+pub mod research;
 pub mod sync;
 pub mod vector;
 
@@ -34,7 +35,9 @@ pub use digest::generate_citations;
 pub use digest::to_rag_xml;
 pub use errors::DnzError;
 pub use evidence::{
-    build_evidence_pack, write_evidence_pack, EvidenceItem, EvidencePack, SearchProvenance,
+    build_csl_references, build_evidence_pack, write_csl_references, write_evidence_pack,
+    write_evidence_pack_markdown, CslDate, CslReference, EvidenceItem, EvidencePack,
+    SearchProvenance,
 };
 pub use export::export_gazette;
 pub use export::generate_frictionless_datapackage;
@@ -57,6 +60,7 @@ pub use models::normalize_xml_search_response;
 #[cfg(feature = "parquet")]
 pub use parquet::write_records_parquet;
 pub use quality::{assess_data_quality, audit_rights_reuse, DataQualityReport, RightsReuseAudit};
+pub use research::{hybrid_search, vector_search, LexicalIndex, ResearchHit};
 pub use sync::{
     build_incremental_sync_manifest, render_incremental_sync_manifest,
     write_incremental_sync_manifest, IncrementalSyncManifest, SyncRecord,

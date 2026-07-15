@@ -17,6 +17,8 @@ pub enum SearchProvenance {
         embedding_dimension: usize,
         index: String,
     },
+    /// A local token-based index with an explicitly named analyzer.
+    Lexical { index: String, analyzer: String },
     /// A result combines named provider and local components.
     Hybrid { components: Vec<SearchProvenance> },
 }
@@ -97,6 +99,128 @@ pub fn write_evidence_pack(path: impl AsRef<Path>, pack: &EvidencePack) -> anyho
     Ok(())
 }
 
+/// A CSL-JSON-compatible reference with only fields supported by the source metadata.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CslReference {
+    #[serde(rename = "type")]
+    pub reference_type: String,
+    pub id: String,
+    pub title: String,
+    #[serde(rename = "URL", skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub publisher: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issued: Option<CslDate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CslDate {
+    #[serde(rename = "date-parts")]
+    pub date_parts: Vec<Vec<i32>>,
+}
+
+/// Build CSL-compatible web references from normalized provider metadata.
+pub fn build_csl_references(records: &[Record]) -> Vec<CslReference> {
+    records
+        .iter()
+        .map(|record| CslReference {
+            reference_type: "webpage".to_string(),
+            id: citation_key(&record.id),
+            title: record.title.clone(),
+            url: record
+                .source_url
+                .clone()
+                .or_else(|| record.landing_url.clone()),
+            publisher: record.display_content_partner.clone().or_else(|| {
+                record
+                    .content_partner
+                    .as_ref()
+                    .and_then(|items| items.first().cloned())
+            }),
+            issued: record.date.as_ref().and_then(|items| {
+                items.first().and_then(|value| {
+                    let year = value.get(..4)?.parse::<i32>().ok()?;
+                    Some(CslDate {
+                        date_parts: vec![vec![year]],
+                    })
+                })
+            }),
+        })
+        .collect()
+}
+
+/// Write a deterministic CSL-JSON array atomically.
+pub fn write_csl_references(
+    path: impl AsRef<Path>,
+    references: &[CslReference],
+) -> anyhow::Result<()> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temporary = path.with_extension("json.tmp");
+    fs::write(&temporary, serde_json::to_vec_pretty(references)?)?;
+    if path.exists() {
+        fs::remove_file(path)?;
+    }
+    fs::rename(temporary, path)?;
+    Ok(())
+}
+
+/// Write a human-readable evidence pack without implying a formal citation style.
+pub fn write_evidence_pack_markdown(
+    path: impl AsRef<Path>,
+    pack: &EvidencePack,
+) -> anyhow::Result<()> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut markdown = format!(
+        "# Evidence Pack\n\n- Query: {}\n- Provenance: `{}`\n\n",
+        pack.query,
+        provenance_label(&pack.provenance)
+    );
+    markdown.push_str("## Sources\n\n");
+    for item in &pack.items {
+        let source = item
+            .source_url
+            .as_deref()
+            .unwrap_or("(no source URL supplied)");
+        markdown.push_str(&format!(
+            "- **{}** (`{}`): {}\n",
+            item.title, item.citation_key, source
+        ));
+        if let Some(rights) = &item.rights {
+            markdown.push_str(&format!("  - Rights metadata: {}\n", rights));
+        }
+        if let Some(rights_url) = &item.rights_url {
+            markdown.push_str(&format!("  - Rights URL: {}\n", rights_url));
+        }
+    }
+    markdown.push_str("\n## Limitations\n\n");
+    for limitation in &pack.limitations {
+        markdown.push_str(&format!("- {}\n", limitation));
+    }
+    let temporary = path.with_extension("md.tmp");
+    fs::write(&temporary, markdown)?;
+    if path.exists() {
+        fs::remove_file(path)?;
+    }
+    fs::rename(temporary, path)?;
+    Ok(())
+}
+
+fn provenance_label(provenance: &SearchProvenance) -> &'static str {
+    match provenance {
+        SearchProvenance::DigitalNzMoreLikeThis { .. } => "digital_nz_more_like_this",
+        SearchProvenance::LocalVector { .. } => "local_vector",
+        SearchProvenance::Lexical { .. } => "lexical",
+        SearchProvenance::Hybrid { .. } => "hybrid",
+    }
+}
+
 fn citation_key(id: &str) -> String {
     let mut key = String::from("dnz-");
     for character in id.chars() {
@@ -143,5 +267,37 @@ mod tests {
             .limitations
             .iter()
             .any(|item| item.contains("not legal advice")));
+    }
+
+    #[test]
+    fn citations_and_markdown_are_explicitly_source_linked() {
+        let record = Record {
+            id: "1".into(),
+            title: "A title".into(),
+            source_url: Some("https://example.test/item".into()),
+            date: Some(vec!["1901-02-03".into()]),
+            ..Record::default()
+        };
+        let citations = build_csl_references(std::slice::from_ref(&record));
+        assert_eq!(citations[0].reference_type, "webpage");
+        assert_eq!(
+            citations[0].issued.as_ref().unwrap().date_parts,
+            vec![vec![1901]]
+        );
+        let pack = build_evidence_pack(
+            "query",
+            &[record],
+            SearchProvenance::LocalVector {
+                model: "test-model".into(),
+                embedding_dimension: 3,
+                index: "memory-v1".into(),
+            },
+        );
+        let output = std::env::temp_dir().join(format!("dnz-evidence-{}.md", std::process::id()));
+        write_evidence_pack_markdown(&output, &pack).unwrap();
+        let markdown = fs::read_to_string(&output).unwrap();
+        assert!(markdown.contains("local_vector"));
+        assert!(markdown.contains("https://example.test/item"));
+        let _ = fs::remove_file(output);
     }
 }

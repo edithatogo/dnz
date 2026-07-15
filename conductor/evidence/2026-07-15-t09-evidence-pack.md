@@ -14,6 +14,21 @@
 - `cargo test -p dnz-core evidence_pack_preserves_source_and_distinguishes_api_mlt` — PASS (1 focused test; integration/property binaries clean under the filter).
 - `cargo clippy -p dnz-core --all-targets --all-features -- -D warnings` — PASS.
 
+## Citation and index slice
+
+- Added CSL-JSON-compatible `webpage` references with source URL, publisher, and conservatively parsed year metadata.
+- Added deterministic Markdown evidence-pack output; it is labelled as an evidence pack rather than a formal citation style.
+- Added an offline lexical token-overlap index with named analyzer/index provenance.
+- Added vector-search and equal-weight hybrid adapters over the existing `VectorStore`; model, dimension, index, and component provenance are retained.
+- No network access or model download occurs during index construction or search.
+
+## Verification
+
+- `cargo test -p dnz-core evidence::tests::` — PASS (2 tests; filtered integration/property binaries clean).
+- `cargo test -p dnz-core research::tests::` — PASS (2 tests; filtered integration/property binaries clean).
+- `cargo clippy -p dnz-core --all-targets --all-features -- -D warnings` — PASS.
+- `cargo fmt --all -- --check` — PASS.
+
 ## Remaining T09 work
 
-CSL-compatible citation export or accurately named generic references, lexical/vector/hybrid index workflow integration, and end-to-end evidence-pack consumption remain.
+End-to-end evidence-pack consumption remains; the scoped citation and offline lexical/vector/hybrid index primitives are implemented.
