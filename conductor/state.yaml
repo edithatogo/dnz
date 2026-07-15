@@ -1,12 +1,12 @@
 schema_version: 2
-last_updated_utc: 2026-07-16T06:00:00Z
-repository_head: ca3385a
+last_updated_utc: 2026-07-16T06:45:00Z
+repository_head: 1666fc7
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
 active_track: T10
 active_slice: contract-drift-and-hardening-gates
-status: in_progress
+status: complete
 
 track_status:
   T00: complete
@@ -19,7 +19,7 @@ track_status:
   T07: complete
   T08: complete
   T09: complete
-  T10: in_progress
+  T10: complete
 
 verified_gates:
   - cargo fmt --all -- --check
@@ -78,6 +78,7 @@ verified_gates:
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (64 unit, 8 integration, 5 property, 0 doctest failures; T06 truthful schema metadata)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (65 unit, 8 integration, 5 property, 0 doctest failures; T06 export reconciliation)
   - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS with repository .pixi Python)
+  - GitHub Actions hardening run 29445121454 (PASS; Rust workspace, MSRV 1.94, OpenAPI, container, package, cargo audit/deny, Gitleaks, and SPDX SBOM; live smoke intentionally skipped)
 completed_tracks:
   - T00
   - T01
@@ -89,9 +90,9 @@ completed_tracks:
   - T07
   - T08
   - T09
-blocked_tracks: []
-in_progress_tracks:
   - T10
+blocked_tracks: []
+in_progress_tracks: []
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
@@ -119,7 +120,7 @@ notes:
   - T07 bounded page/record streams, cache lifecycle, resumable/rate-controlled harvest, recursive density planning, and deterministic incremental sync manifests are verified; T07 is complete.
   - T08 deterministic atomic JSONL, CSV, validated GeoJSON, optional Parquet, SQLite, provenance/checksum metadata, data-quality metrics, rights/reuse audits, and source-grounded Frictionless/schema.org/RO-Crate metadata are verified and complete.
   - T09 evidence packs preserve source links, rights metadata, stable citation keys, CSL-compatible references, Markdown output, and explicit API-MLT/lexical/local-vector/hybrid provenance; T09 is complete.
-  - T10 hardening scripts and workflows are implemented and all local Rust/package/docs gates pass; hosted GitHub execution remains required evidence before T10 closeout.
+  - T10 hardening scripts and workflows are implemented; local and hosted GitHub gates pass. The opt-in live DigitalNZ smoke remains intentionally skipped.
   - T10 audit is locally green after optional exports moved to polars-core plus Arrow/Parquet; one allowed unmaintained paste warning remains and is reported explicitly.
   - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.
