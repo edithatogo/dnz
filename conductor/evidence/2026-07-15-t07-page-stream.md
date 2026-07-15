@@ -33,6 +33,19 @@
 - `cargo fmt --all -- --check` — PASS.
 - `rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --all-features` — PASS (72 unit, 11 integration, 5 property, 0 doctest failures).
 
+## Resumable harvest slice
+
+- Added `HarvestOptions` with explicit partition parallelism, request pacing, and an optional checkpoint path.
+- `Autopilot::harvest_deep_with_options` resumes only matching queries, deduplicates records restored from a checkpoint, and writes deterministic atomic JSON checkpoints after completed partition batches.
+- Failed partitions remain uncompleted so a later run can retry them; checkpoint records never contain credentials.
+- The partitioned harvest test now exercises checkpoint creation and validates the recorded query and completed-year set.
+
+## Harvest verification
+
+- `cargo fmt --all -- --check` — PASS.
+- `cargo test -p dnz-core autopilot::tests::harvest_deep_fetches_year_partitions_and_deduplicates_records` — PASS.
+- `rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings` — PASS.
+
 ## Remaining T07 work
 
-Recursive harvest planning with checkpoint/resume/rate budgets and deterministic incremental-sync manifests remain open.
+Recursive facet-density partitioning and deterministic incremental-sync manifests remain open; checkpoint/resume and rate pacing are now implemented.
