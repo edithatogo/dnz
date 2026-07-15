@@ -12,7 +12,7 @@ pub mod export;
 pub mod models;
 pub mod vector;
 
-pub use autopilot::Autopilot;
+pub use autopilot::{Autopilot, HarvestOptions};
 pub use cache::{CacheEntry, CacheProvenance, PersistentCache};
 pub use client::Client;
 pub use client::FilterExpr;
