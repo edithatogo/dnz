@@ -4,11 +4,66 @@ use crate::client::Client;
 use crate::models::Record;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 const GAZETTE_COLLECTION: &str = "New Zealand Gazette";
+
+/// Deterministic provenance and integrity metadata for an export bundle.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExportProvenance {
+    pub schema_version: u32,
+    pub checksum_algorithm: String,
+    pub source_url: String,
+    pub record_count: usize,
+    pub files: BTreeMap<String, String>,
+    pub limitations: Vec<String>,
+}
+
+/// Build provenance metadata for already-published export files.
+pub fn build_export_provenance(
+    source_url: impl Into<String>,
+    record_count: usize,
+    files: &[PathBuf],
+) -> anyhow::Result<ExportProvenance> {
+    let mut checksums = BTreeMap::new();
+    for path in files {
+        let relative = path.to_string_lossy().replace('\\', "/");
+        checksums.insert(relative, file_checksum(path)?);
+    }
+    Ok(ExportProvenance {
+        schema_version: 1,
+        checksum_algorithm: "fnv1a64".to_string(),
+        source_url: source_url.into(),
+        record_count,
+        files: checksums,
+        limitations: vec![
+            "fnv1a64 provides deterministic change detection, not cryptographic authenticity."
+                .to_string(),
+            "Source metadata reflects the supplied endpoint and does not prove provider completeness."
+                .to_string(),
+        ],
+    })
+}
+
+/// Atomically write provenance metadata as a JSON descriptor.
+pub fn write_export_provenance(
+    path: impl AsRef<Path>,
+    provenance: &ExportProvenance,
+) -> anyhow::Result<()> {
+    write_pretty_json(path.as_ref(), provenance)
+}
+
+fn file_checksum(path: &Path) -> anyhow::Result<String> {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in fs::read(path)? {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    Ok(format!("fnv1a64-{hash:016x}"))
+}
 
 /// Write normalized records as deterministic JSONL using an atomic publish.
 pub fn write_records_jsonl(path: impl AsRef<Path>, records: &[Record]) -> anyhow::Result<()> {
@@ -509,6 +564,32 @@ mod tests {
         write_records_geojson(&output, &[valid]).unwrap();
         assert!(std::fs::read_to_string(&output).unwrap().contains("174.76"));
         let _ = std::fs::remove_file(output);
+    }
+
+    #[test]
+    fn provenance_is_deterministic_and_discloses_checksum_limits() {
+        let file = std::env::temp_dir().join(format!(
+            "dnz-provenance-input-{}-{}.txt",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::write(&file, b"stable export").unwrap();
+        let provenance = build_export_provenance(
+            "https://api.digitalnz.org/v3/records.json",
+            2,
+            std::slice::from_ref(&file),
+        )
+        .unwrap();
+        assert_eq!(provenance.checksum_algorithm, "fnv1a64");
+        assert_eq!(provenance.files.len(), 1);
+        assert!(provenance
+            .limitations
+            .iter()
+            .any(|item| item.contains("not cryptographic")));
+        let _ = std::fs::remove_file(file);
     }
 
     #[test]
