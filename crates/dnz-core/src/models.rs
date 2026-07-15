@@ -361,7 +361,7 @@ fn rss_item_value(item: &XmlNode) -> serde_json::Value {
             other => other,
         }
         .replace('-', "_");
-        let value = serde_json::Value::String(child.text.clone());
+        let value = serde_json::Value::String(child.text.trim().to_string());
         if matches!(key.as_str(), "category" | "subject" | "creator") {
             repeated.entry(key).or_default().push(value);
         } else {
@@ -382,7 +382,11 @@ fn rss_item_value(item: &XmlNode) -> serde_json::Value {
 
 fn parse_xml_document(xml: &[u8]) -> anyhow::Result<XmlNode> {
     let mut reader = Reader::from_reader(xml);
-    reader.config_mut().trim_text(true);
+    // Preserve spaces adjacent to general entity references (for example
+    // `John &amp; Jane`), then trim only at field boundaries when materialising
+    // values. `trim_text(true)` trims each text event independently and would
+    // turn that value into `John&Jane` with quick-xml 0.41.
+    reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack: Vec<XmlNode> = Vec::new();
     let mut root = None;
@@ -403,7 +407,8 @@ fn parse_xml_document(xml: &[u8]) -> anyhow::Result<XmlNode> {
             )?,
             Event::Text(text) => {
                 if let Some(node) = stack.last_mut() {
-                    node.text.push_str(&text.unescape()?);
+                    let decoded = text.decode()?;
+                    node.text.push_str(&quick_xml::escape::unescape(&decoded)?);
                 }
             }
             Event::CData(text) => {
@@ -419,6 +424,27 @@ fn parse_xml_document(xml: &[u8]) -> anyhow::Result<XmlNode> {
             }
             Event::DocType(_) => {
                 anyhow::bail!("XML response contains unsupported entity declarations")
+            }
+            Event::GeneralRef(reference) => {
+                let name = reference.decode()?;
+                let replacement = match name.as_ref() {
+                    "amp" => "&".to_string(),
+                    "apos" => "'".to_string(),
+                    "gt" => ">".to_string(),
+                    "lt" => "<".to_string(),
+                    "quot" => "\"".to_string(),
+                    _ => reference
+                        .resolve_char_ref()?
+                        .map(|character| character.to_string())
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "XML response contains unsupported general entity reference"
+                            )
+                        })?,
+                };
+                if let Some(node) = stack.last_mut() {
+                    node.text.push_str(&replacement);
+                }
             }
             Event::Eof => break,
             Event::Decl(_) | Event::Comment(_) | Event::PI(_) => {}
@@ -449,7 +475,7 @@ fn child_text<'a>(node: &'a XmlNode, names: &[&str]) -> Option<&'a str> {
     node.children
         .iter()
         .find(|child| names.contains(&child.name.as_str()))
-        .map(|child| child.text.as_str())
+        .map(|child| child.text.trim())
 }
 
 fn xml_record_value(node: &XmlNode) -> anyhow::Result<serde_json::Value> {
@@ -498,7 +524,7 @@ fn xml_record_value(node: &XmlNode) -> anyhow::Result<serde_json::Value> {
 
 fn xml_node_value(node: &XmlNode) -> serde_json::Value {
     if node.children.is_empty() {
-        return serde_json::Value::String(node.text.clone());
+        return serde_json::Value::String(node.text.trim().to_string());
     }
     if node
         .children
@@ -511,7 +537,7 @@ fn xml_node_value(node: &XmlNode) -> serde_json::Value {
     if !node.text.is_empty() {
         object.insert(
             "_text".to_string(),
-            serde_json::Value::String(node.text.clone()),
+            serde_json::Value::String(node.text.trim().to_string()),
         );
     }
     for child in &node.children {
