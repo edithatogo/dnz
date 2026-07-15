@@ -30,9 +30,16 @@
 - The checksum algorithm is named `fnv1a64` and is documented as change detection only, not cryptographic authenticity.
 - Full core gate after this slice: 79 unit, 12 integration, 5 property, 0 doctest failures; Clippy passes.
 
+## Data-quality and rights slice
+
+- Added observable `DataQualityReport` metrics for totals, unique/duplicate IDs, missing titles, source URLs, and rights metadata.
+- Added `RightsReuseAudit` counts for rights statements, rights URLs, usage statements, and commercial-use flags.
+- Both reports explicitly state that they summarize supplied metadata only and are not legal advice or determinations of reuse permission.
+- Targeted quality tests pass; Clippy with warnings denied passes.
+
 ## Remaining T08 work
 
-Parquet/Arrow, data-quality metrics, and rights/reuse summaries remain.
+Parquet/Arrow and broader source-grounded metadata packaging remain.
 
 ## Remaining T08 work
 

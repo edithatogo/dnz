@@ -10,6 +10,7 @@ pub mod digest;
 pub mod errors;
 pub mod export;
 pub mod models;
+pub mod quality;
 pub mod sync;
 pub mod vector;
 
@@ -44,6 +45,7 @@ pub use models::normalize_rss_search_response;
 pub use models::normalize_search_response;
 pub use models::normalize_xml_record_response;
 pub use models::normalize_xml_search_response;
+pub use quality::{assess_data_quality, audit_rights_reuse, DataQualityReport, RightsReuseAudit};
 pub use sync::{
     build_incremental_sync_manifest, render_incremental_sync_manifest,
     write_incremental_sync_manifest, IncrementalSyncManifest, SyncRecord,
