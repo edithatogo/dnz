@@ -5,8 +5,8 @@ Add contract-drift and opt-in live tests, full surface CI, audit/deny/license/se
 
 ## Completion record
 
-Status: in_progress
+Status: complete
 
 Evidence: conductor/evidence/2026-07-16-t10-hardening.md
 
-Open decisions/blockers: hosted workflow execution remains required evidence. Local audit is green after the optional export dependency was narrowed to polars-core plus Arrow/Parquet; one allowed unmaintained paste warning remains explicitly reported.
+Open decisions/blockers: none for the offline/release gate. The opt-in live DigitalNZ smoke remains external and intentionally skipped; one allowed unmaintained paste warning remains explicitly reported.
