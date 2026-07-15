@@ -41,6 +41,33 @@ async fn bounded_search_page_stream_fetches_on_demand() {
 }
 
 #[tokio::test]
+async fn bounded_record_stream_yields_records_on_demand() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(query_param("text", "kiwi"))
+        .and(query_param("page", "1"))
+        .and(query_param("per_page", "2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "search": {
+                "result_count": 2,
+                "results": [{"id": "one", "title": "One"}, {"id": "two", "title": "Two"}],
+                "facets": {}
+            }
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let mut records = Client::unauthenticated()
+        .with_base_url(mock_server.uri())
+        .records("kiwi")
+        .per_page(2)
+        .max_records(1);
+
+    assert_eq!(records.next_record().await.unwrap().unwrap().id, "one");
+    assert!(records.next_record().await.unwrap().is_none());
+}
+
+#[tokio::test]
 async fn test_mock_search_request() {
     let mock_server = MockServer::start().await;
 

@@ -46,6 +46,12 @@
 - `cargo test -p dnz-core autopilot::tests::harvest_deep_fetches_year_partitions_and_deduplicates_records` — PASS.
 - `rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings` — PASS.
 
+## Final T07 closure slices
+
+- Added `RecordStream` over the lazy page stream with per-record limits, page-size control, backpressure, and cancellation by drop.
+- Added recursive `plan_density_partitions` with deterministic ordering and explicit oversized-singleton limitations.
+- Final core gate: 76 unit, 12 integration, 5 property, 0 doctest failures; Clippy with warnings denied passes.
+
 ## Remaining T07 work
 
 Recursive facet-density partitioning and deterministic incremental-sync manifests remain open; checkpoint/resume and rate pacing are now implemented.
