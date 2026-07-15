@@ -18,9 +18,15 @@
 - JSONL remains the lossless export path for unknown provider fields; CSV is an intentional tabular projection.
 - Full core gate after this slice: 77 unit, 12 integration, 5 property, 0 doctest failures; Clippy passes with warnings denied.
 
+## GeoJSON slice
+
+- Added `write_records_geojson`, emitting only finite WGS84 points from common provider location shapes and preserving ID/title/source/rights properties.
+- Invalid or absent coordinates are omitted rather than guessed; nested location objects and coordinate arrays are supported.
+- Full core gate after this slice: 78 unit, 12 integration, 5 property, 0 doctest failures; Clippy passes.
+
 ## Remaining T08 work
 
-Parquet/Arrow, validated geospatial output, checksums/schema/provenance expansion, data-quality metrics, and rights/reuse summaries remain.
+Parquet/Arrow, checksums/schema/provenance expansion, data-quality metrics, and rights/reuse summaries remain.
 
 ## Remaining T08 work
 

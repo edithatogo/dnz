@@ -63,6 +63,81 @@ pub fn write_records_csv(path: impl AsRef<Path>, records: &[Record]) -> anyhow::
     atomic_replace(&temporary, path)
 }
 
+/// Write validated record locations as a GeoJSON FeatureCollection.
+///
+/// Records without finite WGS84 coordinates are omitted. Provider location
+/// payloads vary, so extraction accepts common latitude/longitude key pairs
+/// and `[longitude, latitude]` coordinate arrays while enforcing GeoJSON
+/// ranges before emission.
+pub fn write_records_geojson(path: impl AsRef<Path>, records: &[Record]) -> anyhow::Result<()> {
+    if let Some(parent) = path.as_ref().parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let features: Vec<_> = records
+        .iter()
+        .filter_map(|record| {
+            record
+                .locations
+                .as_ref()
+                .and_then(find_coordinates)
+                .map(|(longitude, latitude)| {
+                    json!({
+                        "type": "Feature",
+                        "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
+                        "properties": {
+                            "id": record.id,
+                            "title": record.title,
+                            "source_url": record.source_url,
+                            "rights": record.rights,
+                        }
+                    })
+                })
+        })
+        .collect();
+    let collection = json!({"type": "FeatureCollection", "features": features});
+    write_pretty_json(path.as_ref(), &collection)
+}
+
+fn find_coordinates(value: &serde_json::Value) -> Option<(f64, f64)> {
+    match value {
+        serde_json::Value::Object(object) => {
+            let latitude = ["latitude", "lat"]
+                .iter()
+                .find_map(|key| object.get(*key).and_then(serde_json::Value::as_f64));
+            let longitude = ["longitude", "lon", "lng"]
+                .iter()
+                .find_map(|key| object.get(*key).and_then(serde_json::Value::as_f64));
+            if let (Some(longitude), Some(latitude)) = (longitude, latitude) {
+                if longitude.is_finite()
+                    && latitude.is_finite()
+                    && (-180.0..=180.0).contains(&longitude)
+                    && (-90.0..=90.0).contains(&latitude)
+                {
+                    return Some((longitude, latitude));
+                }
+            }
+            object.values().find_map(find_coordinates)
+        }
+        serde_json::Value::Array(values) => {
+            if values.len() >= 2 {
+                let longitude = values[0].as_f64();
+                let latitude = values[1].as_f64();
+                if let (Some(longitude), Some(latitude)) = (longitude, latitude) {
+                    if longitude.is_finite()
+                        && latitude.is_finite()
+                        && (-180.0..=180.0).contains(&longitude)
+                        && (-90.0..=90.0).contains(&latitude)
+                    {
+                        return Some((longitude, latitude));
+                    }
+                }
+            }
+            values.iter().find_map(find_coordinates)
+        }
+        _ => None,
+    }
+}
+
 fn join_values(values: Option<&[String]>) -> String {
     values.map(|values| values.join(" | ")).unwrap_or_default()
 }
@@ -400,6 +475,39 @@ mod tests {
         assert!(csv.contains("'=unsafe"));
         assert!(csv.contains("\"Title, with \"\"quotes\"\"\""));
         assert!(!output.with_extension("csv.tmp").exists());
+        let _ = std::fs::remove_file(output);
+    }
+
+    #[test]
+    fn geojson_emits_only_valid_coordinates() {
+        let output = std::env::temp_dir().join(format!(
+            "dnz-records-{}-{}.geojson",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut valid = Record {
+            id: "1".into(),
+            title: "Valid".into(),
+            locations: Some(json!({"latitude": -36.85, "longitude": 174.76})),
+            ..Record::default()
+        };
+        let invalid = Record {
+            id: "2".into(),
+            title: "Invalid".into(),
+            locations: Some(json!({"latitude": 95.0, "longitude": 174.76})),
+            ..Record::default()
+        };
+        write_records_geojson(&output, &[valid.clone(), invalid]).unwrap();
+        let value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&output).unwrap()).unwrap();
+        assert_eq!(value["features"].as_array().unwrap().len(), 1);
+        assert_eq!(value["features"][0]["properties"]["id"], "1");
+        valid.locations = Some(json!({"coordinates": [174.76, -36.85]}));
+        write_records_geojson(&output, &[valid]).unwrap();
+        assert!(std::fs::read_to_string(&output).unwrap().contains("174.76"));
         let _ = std::fs::remove_file(output);
     }
 
