@@ -5,8 +5,8 @@ Implement `dnz.api.Dnz`, `Request`, and `Results` from public behaviour without 
 
 ## Completion record
 
-Status: not_started
+Status: complete
 
-Evidence: none
+Evidence: conductor/evidence/2026-07-14-t05-pydnz-compatibility.md
 
-Open decisions/blockers: `maturin` is now provisioned and the task routes through GNU Rust; wheel-level artifact/import verification remains pending completion of the long-running local build. Broader behavioral coverage remains.
+Open decisions/blockers: None for the accepted track surface. Broader optional behavioral combinations remain future hardening.
