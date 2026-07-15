@@ -13,6 +13,7 @@ categories = ["api-bindings"]
 [features]
 default = ["dataframe"]
 dataframe = ["dep:polars"]
+parquet = ["dataframe", "polars/parquet"]
 
 [dependencies]
 tokio = { workspace = true }
