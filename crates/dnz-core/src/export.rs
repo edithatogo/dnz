@@ -258,6 +258,40 @@ pub fn generate_schema_ld(records: &[Record], base_uri: &str) -> serde_json::Val
     })
 }
 
+/// Generate a minimal source-grounded RO-Crate metadata graph.
+pub fn generate_ro_crate_metadata(
+    records: &[Record],
+    base_uri: &str,
+    provenance: &ExportProvenance,
+) -> serde_json::Value {
+    json!({
+        "@context": "https://w3id.org/ro/crate/1.1/context",
+        "@graph": [
+            {
+                "@id": "ro-crate-metadata.json",
+                "@type": "CreativeWork",
+                "about": {"@id": "./"}
+            },
+            {
+                "@id": "./",
+                "@type": "Dataset",
+                "name": "DigitalNZ export",
+                "url": base_uri,
+                "hasPart": [{"@id": "records.jsonl"}],
+                "source": {"@id": provenance.source_url},
+                "sdPublisher": {"@id": "https://digitalnz.org/"},
+                "description": "Metadata export; rights and completeness require source-specific review."
+            },
+            {
+                "@id": "records.jsonl",
+                "@type": "File",
+                "encodingFormat": "application/jsonl",
+                "contentSize": records.len()
+            }
+        ]
+    })
+}
+
 /// Configuration for a deterministic New Zealand Gazette export.
 #[derive(Debug, Clone)]
 pub struct GazetteExportConfig {
@@ -590,6 +624,28 @@ mod tests {
             .iter()
             .any(|item| item.contains("not cryptographic")));
         let _ = std::fs::remove_file(file);
+    }
+
+    #[test]
+    fn ro_crate_metadata_is_source_grounded() {
+        let provenance = ExportProvenance {
+            schema_version: 1,
+            checksum_algorithm: "fnv1a64".into(),
+            source_url: "https://api.digitalnz.org/v3/records.json".into(),
+            record_count: 1,
+            files: BTreeMap::new(),
+            limitations: vec!["metadata only".into()],
+        };
+        let crate_metadata =
+            generate_ro_crate_metadata(&records(), "https://example.test/export", &provenance);
+        assert_eq!(
+            crate_metadata["@graph"][1]["source"]["@id"],
+            provenance.source_url
+        );
+        assert!(crate_metadata["@graph"][1]["description"]
+            .as_str()
+            .unwrap()
+            .contains("rights and completeness"));
     }
 
     #[test]
