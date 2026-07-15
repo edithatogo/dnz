@@ -9,4 +9,4 @@ Status: in_progress
 
 Evidence: conductor/evidence/2026-07-15-t09-evidence-pack.md
 
-Open decisions/blockers: none recorded; citation-format and broader index integration remain.
+Open decisions/blockers: none recorded; end-to-end consumer integration remains.
