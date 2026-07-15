@@ -22,6 +22,17 @@
 
 - `persistent_cache_ttl_rejects_expired_entries` and `offline_mode_fails_without_a_cached_response` pass in the core gate.
 
+## Cache bounds and provenance slice
+
+- Migrated the SQLite cache schema to version 2, adding source URL and authentication namespace provenance while preserving existing v1 databases.
+- Added deterministic oldest-first eviction through `PersistentCache::prune_to_limit` and client configuration through `with_cache_max_entries`.
+- `persistent_cache_records_provenance_and_prunes_oldest_entries` verifies both behaviors.
+
+## Latest verification
+
+- `cargo fmt --all -- --check` — PASS.
+- `rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --all-features` — PASS (72 unit, 11 integration, 5 property, 0 doctest failures).
+
 ## Remaining T07 work
 
-Cache eviction/provenance, recursive harvest planning with checkpoint/resume/rate budgets, and deterministic incremental-sync manifests remain open.
+Recursive harvest planning with checkpoint/resume/rate budgets and deterministic incremental-sync manifests remain open.

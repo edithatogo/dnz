@@ -13,7 +13,7 @@ pub mod models;
 pub mod vector;
 
 pub use autopilot::Autopilot;
-pub use cache::PersistentCache;
+pub use cache::{CacheEntry, CacheProvenance, PersistentCache};
 pub use client::Client;
 pub use client::FilterExpr;
 pub use client::MoreLikeThisQueryBuilder;
