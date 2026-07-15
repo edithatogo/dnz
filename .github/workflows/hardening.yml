@@ -1,0 +1,133 @@
+name: Contract, Security, and Packaging Hardening
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, 'codex/**']
+  workflow_dispatch:
+    inputs:
+      live_smoke:
+        description: Run the low-volume read-only DigitalNZ smoke test
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-surface:
+    name: Rust format, lint, and workspace tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace --all-features
+      - run: cargo bench -p dnz-core --bench benchmarks
+
+  adapters-and-packages:
+    name: Python, MCP, and package metadata checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+      - run: pixi install --locked
+      - run: pixi run package-metadata
+      - run: cargo test -p dnz-mcp --all-features
+      - run: cargo check -p dnz-python --all-features
+      - run: python -m unittest discover -s crates/dnz-python/python/tests -v
+      - name: Validate package metadata
+        shell: pwsh
+        run: ./scripts/validate-package-metadata.ps1 -AllowDirty
+
+  contract:
+    name: Offline OpenAPI drift report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/check_openapi_drift.py --report openapi-drift.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi-drift-report
+          path: openapi-drift.json
+
+  live-smoke:
+    name: Opt-in DigitalNZ live smoke
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.live_smoke }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Run read-only smoke request
+        shell: pwsh
+        env:
+          DIGITALNZ_API_KEY: ${{ secrets.DIGITALNZ_API_KEY }}
+        run: ./scripts/live-digitalnz-smoke.ps1 -RunLive
+
+  security:
+    name: Audit, licenses, secrets, and SBOM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - run: cargo audit
+      - run: cargo deny check
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: dnz.spdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dnz-sbom
+          path: dnz.spdx.json
+
+  container:
+    name: Optional CLI container smoke build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Build container without publishing
+        run: docker build --tag dnz:ci .
