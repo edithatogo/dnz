@@ -1,0 +1,113 @@
+schema_version: 1
+checked_date: 2026-07-12
+status: seed_requires_live_revalidation
+sources:
+  search_docs: https://digitalnz.org/developers/api-docs-v3/search-records-api-v3
+  metadata_docs: https://digitalnz.org/developers/api-docs-v3/get-metadata-api-v3
+  openapi: https://api.swaggerhub.com/apis/DigitalNZ/Records/3
+
+known_endpoints:
+  search:
+    prose_path: /v3/records.{format}
+    openapi_path: /records.{format}
+  record:
+    prose_path: /v3/records/{record_id}.{format}
+    openapi_path: /records/{record_id}.{format}
+  more_like_this:
+    openapi_path: /records/{record_id}/more_like_this.{format}
+
+known_drift_to_verify:
+  - API version prefix differs between prose and OpenAPI path composition.
+  - Existing DNZ fixtures use a search envelope/results; OpenAPI describes a flat records array.
+  - Prose lists json, xml, rss; OpenAPI lists json, xml.
+  - OpenAPI security scheme metadata references query api_key while the parameter description directs Authentication-Token header usage and unauthenticated public access.
+
+auth:
+  public_no_key: documented
+  preferred_header: Authentication-Token
+  legacy_query_parameter: api_key
+  legacy_mode: verify_and_keep_explicit_only
+
+search_parameters:
+  text: string
+  fields: comma_separated_string_or_groups
+  page: {type: integer, minimum: 1, default: 1}
+  per_page: {type: integer, minimum: 0, maximum: 100, default: 20}
+  facets_page: {type: integer, minimum: 1}
+  facets_per_page: {type: integer, maximum: 350, default: 10}
+  sort: [syndication_date, date]
+  direction: [asc, desc]
+  geo_bbox: north_west_south_east
+  exclude_filters_from_facets: boolean
+  filters:
+    and_fields: [category, content_partner, primary_collection, collection, usage, subject, dc_type, format, placename, creator, title, date, year, decade, century]
+    without_equivalent: true
+    or_legacy: true
+    nested_or_syntax: true
+    is_commercial_use: boolean
+    has_large_thumbnail_url: Y_or_absent
+    has_lat_lng: boolean
+  facets:
+    - category
+    - content_partner
+    - display_collection
+    - collection
+    - creator
+    - placename
+    - date
+    - year
+    - decade
+    - century
+    - language
+    - rights
+    - usage
+    - copyright
+    - subject
+    - format
+    - dc_type
+
+record_fields_common:
+  - id
+  - created_at
+  - updated_at
+  - title
+  - description
+  - additional_description
+  - content_partner
+  - display_content_partner
+  - display_collection
+  - primary_collection
+  - collection
+  - collection_title
+  - category
+  - creator
+  - subject
+  - dc_identifier
+  - dc_type
+  - format
+  - language
+  - placename
+  - date
+  - display_date
+  - syndication_date
+  - landing_url
+  - source_url
+  - thumbnail_url
+  - large_thumbnail_url
+  - is_commercial_use
+  - usage
+  - copyright
+  - rights
+  - rights_url
+  - locations
+
+more_like_this:
+  mlt_fields_documented: [title, subject]
+  supports_regular_filters: documented
+  verify_pagination_parameters: true
+
+rights_and_link_semantics:
+  - Prefer source_url for public click-through links where DigitalNZ requests it.
+  - Large thumbnail availability does not itself grant reuse rights.
+  - is_commercial_use and usage metadata must be represented without legal inference.
+  - Missing rights metadata is unknown, not permission.

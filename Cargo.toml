@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-rust-version = "1.84"
+rust-version = "1.94"
 
 [workspace.dependencies]
 tokio = { version = "1.38", features = ["full"] }
