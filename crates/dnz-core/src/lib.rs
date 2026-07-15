@@ -10,6 +10,8 @@ pub mod digest;
 pub mod errors;
 pub mod export;
 pub mod models;
+#[cfg(feature = "parquet")]
+pub mod parquet;
 pub mod quality;
 pub mod sync;
 pub mod vector;
@@ -36,6 +38,7 @@ pub use export::generate_schema_ld;
 pub use export::write_records_csv;
 pub use export::write_records_geojson;
 pub use export::write_records_jsonl;
+pub use export::write_records_sqlite;
 pub use export::GazetteExportConfig;
 pub use export::GazetteExportManifest;
 pub use export::{
@@ -47,6 +50,8 @@ pub use models::normalize_rss_search_response;
 pub use models::normalize_search_response;
 pub use models::normalize_xml_record_response;
 pub use models::normalize_xml_search_response;
+#[cfg(feature = "parquet")]
+pub use parquet::write_records_parquet;
 pub use quality::{assess_data_quality, audit_rights_reuse, DataQualityReport, RightsReuseAudit};
 pub use sync::{
     build_incremental_sync_manifest, render_incremental_sync_manifest,

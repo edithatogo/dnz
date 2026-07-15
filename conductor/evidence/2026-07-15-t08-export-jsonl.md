@@ -43,10 +43,19 @@
 - The package description explicitly limits rights and completeness claims to metadata requiring source-specific review.
 - Targeted RO-Crate test passes; formatting and Clippy remain clean.
 
-## Remaining T08 work
+## Parquet/Arrow slice
 
-Parquet/Arrow remains; source-grounded Frictionless/schema.org/RO-Crate coverage is now implemented for the current export surfaces.
+- Added an explicit `parquet` feature over the existing dataframe adapter; the feature enables Polars Parquet support without changing the default Rust API surface.
+- Added `write_records_parquet` and a non-empty-artifact test. JSONL remains the lossless provider-field-preserving interchange format.
+- `cargo check -p dnz-core --features parquet` — PASS.
+- `cargo test -p dnz-core --features parquet parquet::tests::` — PASS (1 focused test; integration/property binaries clean under the filter).
+- `cargo clippy -p dnz-core --features parquet --all-targets -- -D warnings` — PASS.
 
-## Remaining T08 work
+## Selected database export slice
 
-CSV/Parquet or Arrow export, validated geospatial formats, checksums/schema/provenance expansion, data-quality metrics, and rights/reuse summaries remain.
+- Added `write_records_sqlite` with an atomic temporary database, schema-version metadata, deterministic explicit record columns, rights fields, and a queryability test.
+- `cargo test -p dnz-core sqlite_export_is_queryable_and_records_schema_metadata` — PASS (1 focused test; integration/property binaries clean under the filter).
+
+## T08 closeout
+
+T08 export surfaces and source-grounded packaging are implemented and locally verified: JSONL, CSV, GeoJSON, optional Parquet, SQLite, Frictionless, schema.org, RO-Crate, checksums/provenance, data-quality metrics, and rights/reuse summaries. Rights and completeness outputs remain metadata audits with explicit caveats, not legal determinations or provider-completeness claims.

@@ -2,6 +2,7 @@
 
 use crate::client::Client;
 use crate::models::Record;
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -151,6 +152,64 @@ pub fn write_records_geojson(path: impl AsRef<Path>, records: &[Record]) -> anyh
         .collect();
     let collection = json!({"type": "FeatureCollection", "features": features});
     write_pretty_json(path.as_ref(), &collection)
+}
+
+/// Write a stable SQLite projection of normalized records using an atomic publish.
+///
+/// JSONL remains the lossless interchange format. This selected relational
+/// projection is intended for lightweight local querying and keeps rights and
+/// provenance fields explicit without flattening every provider-specific field.
+pub fn write_records_sqlite(path: impl AsRef<Path>, records: &[Record]) -> anyhow::Result<()> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temporary = temporary_path(path);
+    let result = (|| -> anyhow::Result<()> {
+        let connection = Connection::open(&temporary)?;
+        connection.execute_batch(
+            r#"CREATE TABLE export_metadata (schema_version INTEGER NOT NULL, record_count INTEGER NOT NULL);
+               CREATE TABLE records (
+                   id TEXT PRIMARY KEY NOT NULL,
+                   title TEXT NOT NULL,
+                   description TEXT,
+                   source_url TEXT,
+                   rights TEXT,
+                   rights_url TEXT,
+                   usage TEXT,
+                   is_commercial_use INTEGER
+               );"#,
+        )?;
+        let transaction = connection.unchecked_transaction()?;
+        for record in records {
+            transaction.execute(
+                r#"INSERT INTO records (id, title, description, source_url, rights, rights_url, usage, is_commercial_use)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
+                params![
+                    record.id,
+                    record.title,
+                    record.description,
+                    record.source_url,
+                    record.rights,
+                    record.rights_url,
+                    record.usage,
+                    record.is_commercial_use.map(i64::from),
+                ],
+            )?;
+        }
+        transaction.execute(
+            "INSERT INTO export_metadata (schema_version, record_count) VALUES (?1, ?2)",
+            params![1_i64, records.len() as i64],
+        )?;
+        transaction.commit()?;
+        connection.execute_batch("VACUUM")?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result?;
+    atomic_replace(&temporary, path)
 }
 
 fn find_coordinates(value: &serde_json::Value) -> Option<(f64, f64)> {
@@ -564,6 +623,30 @@ mod tests {
         assert!(csv.contains("'=unsafe"));
         assert!(csv.contains("\"Title, with \"\"quotes\"\"\""));
         assert!(!output.with_extension("csv.tmp").exists());
+        let _ = std::fs::remove_file(output);
+    }
+
+    #[test]
+    fn sqlite_export_is_queryable_and_records_schema_metadata() {
+        let output = std::env::temp_dir().join(format!(
+            "dnz-export-{}.sqlite",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        write_records_sqlite(&output, &records()).unwrap();
+        let connection = Connection::open(&output).unwrap();
+        let record_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM records", [], |row| row.get(0))
+            .unwrap();
+        let schema_version: i64 = connection
+            .query_row("SELECT schema_version FROM export_metadata", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(record_count, 1);
+        assert_eq!(schema_version, 1);
         let _ = std::fs::remove_file(output);
     }
 

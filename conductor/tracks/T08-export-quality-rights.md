@@ -5,8 +5,8 @@ Implement streaming deterministic atomic exports and valid source-grounded metad
 
 ## Completion record
 
-Status: in_progress
+Status: complete
 
 Evidence: conductor/evidence/2026-07-15-t08-export-jsonl.md
 
-Open decisions/blockers: CSV/Parquet/geospatial/quality/rights slices remain.
+Open decisions/blockers: none for the scoped T08 acceptance criteria. Follow-up live/provider completeness validation remains a T10 operational concern, not a T08 implementation blocker.
