@@ -1,6 +1,6 @@
 schema_version: 2
-last_updated_utc: 2026-07-15T16:00:00Z
-repository_head: 8619d10
+last_updated_utc: 2026-07-15T17:00:00Z
+repository_head: 2ecf99d
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
@@ -46,6 +46,8 @@ verified_gates:
   - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --features parquet parquet::tests:: (PASS; 1 focused test; T08 Parquet artifact)
   - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --features parquet --all-targets -- -D warnings (PASS; T08 Parquet feature)
   - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core sqlite_export_is_queryable_and_records_schema_metadata (PASS; T08 SQLite export)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core evidence_pack_preserves_source_and_distinguishes_api_mlt (PASS; T09 evidence pack)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T09 evidence pack)
   - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T07 incremental sync manifest)
   - cargo +stable-x86_64-pc-windows-gnu test -p dnz-mcp --all-features (7 tests passed; T04 MCP record/MLT parity)
   - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS after T04 MCP parity)
@@ -84,6 +86,7 @@ latest_evidence:
   - conductor/evidence/2026-07-14-t05-pydnz-compatibility.md
   - conductor/evidence/2026-07-15-t07-page-stream.md
   - conductor/evidence/2026-07-15-t08-export-jsonl.md
+  - conductor/evidence/2026-07-15-t09-evidence-pack.md
 latest_handoff: conductor/handoff.md
 notes:
   - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
@@ -96,5 +99,6 @@ notes:
   - T05 clean-room dnz.api facade, compatibility tests, GNU wheel build, and isolated wheel import verification are complete; broader optional behavioral combinations remain future hardening.
   - T07 bounded page/record streams, cache lifecycle, resumable/rate-controlled harvest, recursive density planning, and deterministic incremental sync manifests are verified; T07 is complete.
   - T08 deterministic atomic JSONL, CSV, validated GeoJSON, optional Parquet, SQLite, provenance/checksum metadata, data-quality metrics, rights/reuse audits, and source-grounded Frictionless/schema.org/RO-Crate metadata are verified and complete.
+  - T09 evidence packs now preserve source links, rights metadata, stable citation keys, and explicit API-MLT/local-vector/hybrid provenance; citation-format and broader index integration remain.
   - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.
