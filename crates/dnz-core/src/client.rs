@@ -26,6 +26,8 @@ pub struct Client {
     // Thread-safe query cache
     cache: Arc<Mutex<HashMap<String, SearchResponse>>>,
     persistent_cache: Option<PersistentCache>,
+    cache_ttl: Option<Duration>,
+    offline: bool,
 }
 
 impl Client {
@@ -41,6 +43,8 @@ impl Client {
                 .expect("default HTTP client configuration is valid"),
             cache: Arc::new(Mutex::new(HashMap::new())),
             persistent_cache: None,
+            cache_ttl: None,
+            offline: false,
         }
     }
 
@@ -88,6 +92,18 @@ impl Client {
     pub fn with_cache_path(mut self, cache_path: impl Into<PathBuf>) -> anyhow::Result<Self> {
         self.persistent_cache = Some(PersistentCache::new(cache_path)?);
         Ok(self)
+    }
+
+    /// Reject persistent cache entries older than `ttl`.
+    pub fn with_cache_ttl(mut self, ttl: Duration) -> Self {
+        self.cache_ttl = Some(ttl);
+        self
+    }
+
+    /// Prevent network requests; queries must be satisfied by cache entries.
+    pub fn offline(mut self) -> Self {
+        self.offline = true;
+        self
     }
 
     /// Clear cache entries.
@@ -473,6 +489,18 @@ mod tests {
         let result2 = client.search("kauri").send().await.unwrap();
         assert_eq!(result2.search.result_count, 1);
         assert_eq!(result2.search.results[0].id, "1");
+    }
+
+    #[tokio::test]
+    async fn offline_mode_fails_without_a_cached_response() {
+        let error = Client::unauthenticated()
+            .offline()
+            .search("uncached")
+            .send()
+            .await
+            .expect_err("offline uncached query should fail");
+
+        assert!(error.to_string().contains("offline mode"));
     }
 
     #[tokio::test]
@@ -1014,14 +1042,16 @@ impl QueryBuilder {
         let cache_key = self.cache_key(&query_params);
 
         if self.use_cache {
-            if let Ok(c) = self.client.cache.lock() {
-                if let Some(cached_resp) = c.get(&cache_key) {
-                    debug!("Returning cached response for query");
-                    return Ok(cached_resp.clone());
+            if self.client.cache_ttl.is_none() {
+                if let Ok(c) = self.client.cache.lock() {
+                    if let Some(cached_resp) = c.get(&cache_key) {
+                        debug!("Returning cached response for query");
+                        return Ok(cached_resp.clone());
+                    }
                 }
             }
             if let Some(cache) = &self.client.persistent_cache {
-                match cache.get(&cache_key) {
+                match cache.get_with_max_age(&cache_key, self.client.cache_ttl) {
                     Ok(Some(cached_resp)) => {
                         debug!(cache_path = ?cache.path(), "Returning persistent cached response for query");
                         if let Ok(mut c) = self.client.cache.lock() {
@@ -1033,6 +1063,12 @@ impl QueryBuilder {
                     Err(err) => warn!(error = ?err, "Failed to read persistent cache"),
                 }
             }
+        }
+
+        if self.client.offline {
+            return Err(anyhow::anyhow!(
+                "offline mode has no usable cached response for this query"
+            ));
         }
 
         let safe_params: Vec<_> = query_params
