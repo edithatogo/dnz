@@ -29,7 +29,7 @@ jobs:
         run: npm install --prefix docs --no-audit --no-fund
 
       - name: Check docs
-        run: npm run docs:check
+        run: npm run check --prefix docs
 
       - name: Build docs
-        run: npm run docs:build
+        run: npm run build --prefix docs
