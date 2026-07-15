@@ -49,3 +49,14 @@
 ## Remaining T07 work
 
 Recursive facet-density partitioning and deterministic incremental-sync manifests remain open; checkpoint/resume and rate pacing are now implemented.
+
+## Incremental sync slice
+
+- Added deterministic `IncrementalSyncManifest` generation over normalized records with stable ID ordering and FNV-1a fingerprints.
+- Added candid added/updated/removed counts; removals are explicitly limited to the supplied prior manifest because DigitalNZ does not provide a deletion feed through this abstraction.
+- Added repeatable rendering and atomic manifest writes with no timestamps or credential material.
+
+## Latest verification
+
+- `rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --all-features` — PASS (74 unit, 11 integration, 5 property, 0 doctest failures).
+- `rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings` — PASS.

@@ -10,6 +10,7 @@ pub mod digest;
 pub mod errors;
 pub mod export;
 pub mod models;
+pub mod sync;
 pub mod vector;
 
 pub use autopilot::{Autopilot, HarvestOptions};
@@ -38,6 +39,10 @@ pub use models::normalize_rss_search_response;
 pub use models::normalize_search_response;
 pub use models::normalize_xml_record_response;
 pub use models::normalize_xml_search_response;
+pub use sync::{
+    build_incremental_sync_manifest, render_incremental_sync_manifest,
+    write_incremental_sync_manifest, IncrementalSyncManifest, SyncRecord,
+};
 pub use vector::cosine_similarity;
 pub use vector::ensure_embedding_model;
 pub use vector::DocumentVector;
