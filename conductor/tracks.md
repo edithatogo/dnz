@@ -1,5 +1,9 @@
 # Project Tracks
 
+## [ ] Track: digitalnz_dataset_registry_readiness_20260721
+
+[Specification and plan](./tracks/digitalnz_dataset_registry_readiness_20260721/)
+
 ---
 ## [x] Track 1: Scaffold CLI & MCP Skeleton
 - Folder: [scaffold-cli-mcp-skeleton](./tracks/scaffold-cli-mcp-skeleton)
