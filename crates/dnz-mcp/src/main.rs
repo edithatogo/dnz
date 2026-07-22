@@ -425,7 +425,9 @@ mod tests {
             .mount(&server)
             .await;
 
-        let client = Client::new("test-key").with_base_url(server.uri());
+        let client = Client::new("test-key")
+            .with_base_url(server.uri())
+            .with_legacy_query_key_auth();
         let response = handle_request(
             &request(
                 "tools/call",
@@ -457,7 +459,7 @@ mod tests {
             .and(query_param("api_key", "test-key"))
             .and(query_param("text", "kauri"))
             .and(query_param("page", "1"))
-            .and(query_param("per_page", "1"))
+            .and(query_param("per_page", "0"))
             .and(query_param("facets", "category,collection"))
             .and(query_param("facets_page", "2"))
             .and(query_param("facets_per_page", "3"))
@@ -478,7 +480,9 @@ mod tests {
             .mount(&server)
             .await;
 
-        let client = Client::new("test-key").with_base_url(server.uri());
+        let client = Client::new("test-key")
+            .with_base_url(server.uri())
+            .with_legacy_query_key_auth();
         let response = handle_request(
             &request(
                 "tools/call",
