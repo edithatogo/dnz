@@ -459,7 +459,7 @@ mod tests {
             .and(query_param("api_key", "test-key"))
             .and(query_param("text", "kauri"))
             .and(query_param("page", "1"))
-            .and(query_param("per_page", "1"))
+            .and(query_param("per_page", "0"))
             .and(query_param("facets", "category,collection"))
             .and(query_param("facets_page", "2"))
             .and(query_param("facets_per_page", "3"))
