@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Install Python 3.14
         uses: actions/setup-python@v6
@@ -27,12 +27,12 @@ jobs:
         run: python scripts/check_python_runtime_policy.py
 
       - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
           components: clippy, rustfmt
 
       - name: Cache Cargo Dependencies
-        uses: swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
@@ -46,7 +46,7 @@ jobs:
         run: cargo test --workspace --all-features
 
       - name: Install Cargo Audit
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2
         with:
           tool: cargo-audit
 
@@ -71,7 +71,7 @@ jobs:
         run: python -m unittest tests.test_python_runtime_policy tests.test_rnz_archive
 
       - name: Install Cargo LLVM Cov
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2
         with:
           tool: cargo-llvm-cov
 
