@@ -1,12 +1,12 @@
 schema_version: 2
-last_updated_utc: 2026-07-16T09:00:00Z
+last_updated_utc: 2026-08-02T00:00:00Z
 repository_head: 0430762
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
-active_track: T10
-active_slice: contract-drift-and-hardening-gates
-status: complete
+active_track: T12
+active_slice: workflow-policy-and-maintainer-context
+status: in_progress
 
 track_status:
   T00: complete
@@ -20,6 +20,8 @@ track_status:
   T08: complete
   T09: complete
   T10: complete
+  T11: blocked
+  T12: in_progress
 
 verified_gates:
   - cargo fmt --all -- --check
@@ -93,8 +95,8 @@ completed_tracks:
   - T08
   - T09
   - T10
-blocked_tracks: []
-in_progress_tracks: []
+blocked_tracks: [T11]
+in_progress_tracks: [T12]
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
@@ -109,6 +111,7 @@ latest_evidence:
   - conductor/evidence/2026-07-15-t08-export-jsonl.md
   - conductor/evidence/2026-07-15-t09-evidence-pack.md
   - conductor/evidence/2026-07-16-t10-hardening.md
+  - conductor/evidence/2026-08-02-t11-t12-inventory.md
 latest_handoff: conductor/handoff.md
 notes:
   - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
@@ -126,3 +129,8 @@ notes:
   - T10 audit is locally green after optional exports moved to polars-core plus Arrow/Parquet; one allowed unmaintained paste warning remains and is reported explicitly.
   - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
   - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.
+  - T11/T12 are post-roadmap GitHub follow-up tracks. T11 external DOI publication and registry acceptance remain blocked until the respective service accepts the submission; T12 repository rulesets, Renovate/Codecov onboarding, and hosted settings remain external approval gates.
+  - T11 local registry inventory, Croissant metadata, rights/provenance card, and offline validator pass; DOI minting and Hugging Face publication/acceptance remain blocked external actions.
+  - T12 local workflow references are pinned to immutable upstream action commits, strict offline workflow policy validation passes, maintainer/security/contribution context exists, and a bounded mutation lane is opt-in; hosted rulesets, Renovate app access, and Codecov onboarding remain external.
+  - The bounded mutation lane was attempted twice and could not complete the unmutated workspace baseline within the local window; no mutation score is claimed. CI or a host with a working complete GNU/MSVC toolchain is required.
+  - RNZ monthly Zenodo run 30687409986 failed because the publish job did not hydrate the digitalnz submodule; the local workflow now uses recursive submodule checkout and an explicit metadata presence check. Hosted confirmation remains gated on commit/push.
