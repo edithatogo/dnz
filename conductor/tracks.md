@@ -112,3 +112,9 @@
 - Status: Blocked until Tracks 22 through 26 are complete, reviewed and archived. Manual user-owned hardware only; zero external spend.
 
 ---
+
+## [ ] Track: Python 3.14-only runtime
+
+- Folder: [python-314-only-runtime-20260810](./tracks/python-314-only-runtime-20260810/)
+
+---
