@@ -30,6 +30,7 @@ if ($isWindows) {
 }
 if ($isWindows -and $gnuToolchain -and $mingwBin -and (Test-Path -LiteralPath $mingwBin)) {
     $env:RUSTUP_TOOLCHAIN = "stable-x86_64-pc-windows-gnu"
+    $env:CARGO = (& rustup which cargo --toolchain stable-x86_64-pc-windows-gnu)
 }
 
 if (-not $env:CARGO_BUILD_JOBS) {
@@ -58,10 +59,13 @@ function Invoke-Tool {
 if (-not $SkipBuild) {
     Write-Host "Building Python wheel with maturin..."
     $maturinArgs = @("build", "--release", "--manifest-path", "crates/dnz-python/Cargo.toml")
+    if ($isWindows -and $env:CARGO) {
+        $maturinArgs += @("--target", "x86_64-pc-windows-gnu")
+    }
     if (-not $Python) {
         $candidatePythons = @(
             (Join-Path $repo ".pixi\envs\default\python.exe"),
-            (Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe")
+            (Join-Path $env:LOCALAPPDATA "Programs\Python\Python314\python.exe")
         )
         foreach ($candidate in $candidatePythons) {
             if (Test-Path -LiteralPath $candidate) {

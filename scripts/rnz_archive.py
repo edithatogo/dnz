@@ -807,11 +807,65 @@ def verify_item_outputs(output_dir: Path, expected_duration: float) -> dict[str,
     }
 
 
+def _serialize_whisper_segments(segments: Any) -> list[dict[str, Any]]:
+    serialized: list[dict[str, Any]] = []
+    for segment in segments:
+        words = [
+            {
+                "word": word.word,
+                "start": word.start,
+                "end": word.end,
+                "score": word.probability,
+            }
+            for word in (segment.words or [])
+        ]
+        serialized.append(
+            {
+                "start": segment.start,
+                "end": segment.end,
+                "text": segment.text,
+                "words": words,
+            }
+        )
+    return serialized
+
+
+def _diarization_rows(output: Any) -> list[dict[str, Any]]:
+    annotation = getattr(output, "speaker_diarization", output)
+    return [
+        {"start": turn.start, "end": turn.end, "speaker": str(speaker)}
+        for turn, _, speaker in annotation.itertracks(yield_label=True)
+    ]
+
+
+def _speaker_for_interval(start: float, end: float, rows: list[dict[str, Any]]) -> str:
+    best_speaker = "SPEAKER_UNKNOWN"
+    best_overlap = 0.0
+    for row in rows:
+        overlap = max(0.0, min(end, float(row["end"])) - max(start, float(row["start"])))
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_speaker = str(row["speaker"])
+    return best_speaker
+
+
+def _assign_speakers(segments: list[dict[str, Any]], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    for segment in segments:
+        words = segment.get("words", [])
+        for word in words:
+            word["speaker"] = _speaker_for_interval(float(word["start"]), float(word["end"]), rows)
+        speakers = [word["speaker"] for word in words if word["speaker"] != "SPEAKER_UNKNOWN"]
+        segment["speaker"] = max(dict.fromkeys(speakers), key=speakers.count) if speakers else _speaker_for_interval(
+            float(segment["start"]), float(segment["end"]), rows
+        )
+    return segments
+
+
 def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: str, duration: float) -> dict[str, Any]:
-    import whisperx
+    from faster_whisper import WhisperModel
     from faster_whisper.utils import download_model
     from huggingface_hub import snapshot_download
-    from whisperx.diarize import DiarizationPipeline
+    from pyannote.audio import Pipeline
 
     models = policy["models"]
     device = "cpu"
@@ -819,17 +873,12 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
         models["transcription_primary_repo"],
         revision=models["transcription_primary_revision"],
     )
-    model = whisperx.load_model(transcription_path, device, compute_type="int8", language=None)
-    raw = model.transcribe(str(audio), batch_size=1)
-    language = raw.get("language", "unknown")
+    model = WhisperModel(transcription_path, device=device, compute_type="int8")
+    raw_segments, info = model.transcribe(str(audio), word_timestamps=True)
+    segments = _serialize_whisper_segments(raw_segments)
+    language = getattr(info, "language", "unknown")
     quality_flags: list[str] = []
     rows: list[dict[str, Any]] = []
-    try:
-        align_model, metadata = whisperx.load_align_model(language_code=language, device=device)
-        aligned = whisperx.align(raw["segments"], align_model, metadata, str(audio), device, return_char_alignments=False)
-    except Exception:
-        aligned = raw
-        quality_flags.append("alignment_unavailable")
     if not hf_token:
         raise RuntimeError("HF_TOKEN with gated pyannote model access is required")
     try:
@@ -838,12 +887,10 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
             revision=models["diarization_revision"],
             token=hf_token,
         )
-        diarizer = DiarizationPipeline(
-            model_name=diarization_path, token=hf_token, device=device
-        )
-        diarization = diarizer(str(audio))
-        aligned = whisperx.assign_word_speakers(diarization, aligned)
-        rows = diarization[["start", "end", "speaker"]].to_dict(orient="records")
+        diarizer = Pipeline.from_pretrained(diarization_path, token=hf_token)
+        diarization = diarizer({"audio": str(audio)})
+        rows = _diarization_rows(diarization)
+        segments = _assign_speakers(segments, rows)
         (output_dir / "diarization.rttm").write_text(
             "\n".join(rttm_lines(audio.stem, rows)) + "\n", encoding="utf-8"
         )
@@ -851,8 +898,8 @@ def transcribe(audio: Path, output_dir: Path, policy: dict[str, Any], hf_token: 
         raise RuntimeError(f"speaker diarization failed: {exc}") from exc
     result = {
         "language": language,
-        "segments": aligned.get("segments", []),
-        "word_segments": aligned.get("word_segments", []),
+        "segments": segments,
+        "word_segments": [word for segment in segments for word in segment.get("words", [])],
         "models": models,
         "quality_flags": quality_flags,
         "generated_at": utc_now(),

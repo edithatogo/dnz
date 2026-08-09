@@ -20,6 +20,40 @@ EVAL_SPEC.loader.exec_module(rnz_evaluate)
 
 
 class RNZArchiveTests(unittest.TestCase):
+    def test_faster_whisper_segments_preserve_canonical_schema(self):
+        word = type("Word", (), {"word": " kia", "start": 0.1, "end": 0.4, "probability": 0.9})()
+        segment = type("Segment", (), {"text": " kia", "start": 0.0, "end": 0.5, "words": [word]})()
+        self.assertEqual(
+            [{"start": 0.0, "end": 0.5, "text": " kia", "words": [{"word": " kia", "start": 0.1, "end": 0.4, "score": 0.9}]}],
+            rnz_archive._serialize_whisper_segments([segment]),
+        )
+
+    def test_pyannote_output_and_speaker_assignment_preserve_anonymous_labels(self):
+        turn = type("Turn", (), {"start": 0.0, "end": 0.7})()
+        annotation = mock.Mock()
+        annotation.itertracks.return_value = [(turn, "track", "SPEAKER_00")]
+        output = type("Output", (), {"speaker_diarization": annotation})()
+        rows = rnz_archive._diarization_rows(output)
+        segments = [{"start": 0.0, "end": 0.5, "text": "kia", "words": [{"word": "kia", "start": 0.1, "end": 0.4, "score": 0.9}]}]
+        assigned = rnz_archive._assign_speakers(segments, rows)
+        self.assertEqual("SPEAKER_00", assigned[0]["speaker"])
+        self.assertEqual("SPEAKER_00", assigned[0]["words"][0]["speaker"])
+
+    def test_speaker_assignment_fails_closed_when_no_interval_overlaps(self):
+        segments = [{"start": 0.0, "end": 0.5, "text": "kia", "words": []}]
+        self.assertEqual("SPEAKER_UNKNOWN", rnz_archive._assign_speakers(segments, [])[0]["speaker"])
+
+    def test_speaker_assignment_breaks_ties_by_first_observed_speaker(self):
+        segments = [{"start": 0.0, "end": 1.0, "text": "kia ora", "words": [
+            {"word": "kia", "start": 0.0, "end": 0.4},
+            {"word": "ora", "start": 0.6, "end": 1.0},
+        ]}]
+        rows = [
+            {"start": 0.0, "end": 0.5, "speaker": "SPEAKER_00"},
+            {"start": 0.5, "end": 1.0, "speaker": "SPEAKER_01"},
+        ]
+        self.assertEqual("SPEAKER_00", rnz_archive._assign_speakers(segments, rows)[0]["speaker"])
+
     def test_balanced_collection_quotas_cover_all_sources(self):
         quotas = rnz_archive.balanced_quotas(100, ["a", "b", "c", "d", "e", "f"])
         self.assertEqual(100, sum(quotas.values()))
