@@ -55,7 +55,7 @@
     "transcription_fallback_revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
     "diarization": "pyannote/speaker-diarization-community-1",
     "diarization_revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
-    "whisperx_version": "3.8.6",
+    "transcription_backend": "faster-whisper",
     "faster_whisper_version": "1.2.1",
     "pyannote_audio_version": "4.0.7"
   }

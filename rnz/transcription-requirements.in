@@ -6,7 +6,6 @@ huggingface-hub==0.36.2
 pyannote.audio==4.0.7
 pyarrow==23.0.1
 requests==2.32.5
-torch==2.8.0+cpu
-torchaudio==2.8.0+cpu
-torchvision==0.23.0+cpu
-whisperx==3.8.6
+torch==2.10.0+cpu
+torchaudio==2.10.0+cpu
+torchvision==0.25.0+cpu
