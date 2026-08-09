@@ -19,3 +19,13 @@ Date: 2026-08-10
 ## Compatibility correction
 
 WhisperX does not support Python 3.14 and pins an older Torch family. The RNZ pipeline now uses its already-pinned underlying Faster Whisper and pyannote libraries directly. Unit tests cover canonical segment conversion, pyannote 4 output conversion, anonymous speaker assignment, unknown-speaker fallback, and the full packaging path.
+
+## Hosted evidence
+
+PR #43 completed every required check successfully on commit `7f21b14`:
+
+- Python analysis: <https://github.com/edithatogo/dnz/actions/runs/31321243353/job/93264461151>
+- Dependency review: <https://github.com/edithatogo/dnz/actions/runs/31321243346/job/93264461119>
+- Astro documentation: <https://github.com/edithatogo/dnz/actions/runs/31321243349/job/93264461130>
+- Code quality and test coverage: <https://github.com/edithatogo/dnz/actions/runs/31321243366/job/93264461226>
+- CodeQL: <https://github.com/edithatogo/dnz/runs/93264579735>

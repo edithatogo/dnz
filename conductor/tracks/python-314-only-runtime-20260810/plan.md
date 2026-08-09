@@ -25,9 +25,9 @@
 
 ## Phase 4: Publication and hosted evidence
 
-- [~] Task: Reconcile Conductor specification, plan, registry, state, and evidence.
+- [x] Task: Reconcile Conductor specification, plan, registry, state, and evidence.
 - [x] Task: Commit only the scoped migration. Task-level commits recorded above.
-- [ ] Task: Push an isolated branch and open a draft PR.
-- [ ] Task: Inspect hosted CI and address only migration-related failures.
-- [ ] Task: Mark the track complete only after all required evidence passes.
-- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md).
+- [x] Task: Push an isolated branch and open a draft PR. PR #43.
+- [x] Task: Inspect hosted CI and address only migration-related failures. All required checks passed without migration-related failures.
+- [x] Task: Mark the track complete only after all required evidence passes.
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md). Hosted Python analysis, dependency review, documentation, quality/coverage, and CodeQL checks passed.
