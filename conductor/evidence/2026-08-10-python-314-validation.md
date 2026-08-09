@@ -29,3 +29,5 @@ PR #43 completed every required check successfully on commit `7f21b14`:
 - Astro documentation: <https://github.com/edithatogo/dnz/actions/runs/31321243349/job/93264461130>
 - Code quality and test coverage: <https://github.com/edithatogo/dnz/actions/runs/31321243366/job/93264461226>
 - CodeQL: <https://github.com/edithatogo/dnz/runs/93264579735>
+
+The post-review fix on commit `503774f` also passed the complete hosted set, including quality and coverage at <https://github.com/edithatogo/dnz/actions/runs/31321603626/job/93265356218>.
