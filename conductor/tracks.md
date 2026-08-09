@@ -110,11 +110,3 @@
 ## [!] Track 27: Optional Local RNZ Compute
 - Folder: [rnz-optional-local-compute-20260713](./tracks/rnz-optional-local-compute-20260713)
 - Status: Blocked until Tracks 22 through 26 are complete, reviewed and archived. Manual user-owned hardware only; zero external spend.
-
----
-
-## [x] Track: Python 3.14-only runtime
-
-- Folder: [python-314-only-runtime-20260810](./tracks/python-314-only-runtime-20260810/)
-
----
