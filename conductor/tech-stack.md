@@ -4,6 +4,7 @@
 
 ### Programming Language & Runtime
 - **Rust (Edition 2021):** Main development language for compile-time safety and peak execution performance.
+- **Python 3.14:** Sole supported Python runtime for bindings, automation, and the pinned RNZ transcription environment.
 - **Tokio:** Asynchronous runtime driving the non-blocking MCP server, CLI operations, and API integrations.
 
 ### Base Libraries & API Integration
