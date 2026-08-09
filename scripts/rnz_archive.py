@@ -855,7 +855,7 @@ def _assign_speakers(segments: list[dict[str, Any]], rows: list[dict[str, Any]])
         for word in words:
             word["speaker"] = _speaker_for_interval(float(word["start"]), float(word["end"]), rows)
         speakers = [word["speaker"] for word in words if word["speaker"] != "SPEAKER_UNKNOWN"]
-        segment["speaker"] = max(set(speakers), key=speakers.count) if speakers else _speaker_for_interval(
+        segment["speaker"] = max(dict.fromkeys(speakers), key=speakers.count) if speakers else _speaker_for_interval(
             float(segment["start"]), float(segment["end"]), rows
         )
     return segments
