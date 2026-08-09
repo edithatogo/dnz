@@ -113,7 +113,7 @@
 
 ---
 
-## [ ] Track: Python 3.14-only runtime
+## [~] Track: Python 3.14-only runtime
 
 - Folder: [python-314-only-runtime-20260810](./tracks/python-314-only-runtime-20260810/)
 

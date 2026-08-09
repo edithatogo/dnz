@@ -2,7 +2,7 @@
 
 ## Phase 1: Baseline and policy
 
-- [ ] Task: Record current Python constraints, lockfile entries, workflows, scripts, and documentation.
+- [~] Task: Record current Python constraints, lockfile entries, workflows, scripts, and documentation.
 - [ ] Task: Add failing policy checks proving every supported runtime declaration resolves to Python 3.14.
 - [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md).
 
