@@ -43,6 +43,15 @@ def validate_runtime_policy(root: Path = ROOT) -> list[str]:
     if "--python-version 3.14" not in transcription_lock.splitlines()[1]:
         errors.append("transcription lock provenance must target Python 3.14")
 
+    transcription_input = (
+        root / "rnz" / "transcription-requirements.in"
+    ).read_text(encoding="utf-8")
+    archive_script = (root / "scripts" / "rnz_archive.py").read_text(encoding="utf-8")
+    if re.search(r"^whisperx(?:\W|$)", transcription_input, re.MULTILINE | re.IGNORECASE):
+        errors.append("transcription dependencies retain Python-incompatible WhisperX")
+    if re.search(r"(?:import|from)\s+whisperx(?:\W|$)", archive_script):
+        errors.append("RNZ archive runtime imports Python-incompatible WhisperX")
+
     return errors
 
 

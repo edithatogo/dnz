@@ -18,6 +18,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v5
 
+      - name: Install Python 3.14
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Validate Python 3.14-only policy
+        run: python scripts/check_python_runtime_policy.py
+
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -51,13 +59,13 @@ jobs:
         run: ./scripts/validate-package-metadata.ps1
 
       - name: Validate Conductor Learning Log
-        run: python3 scripts/validate_learning_log.py
+        run: python scripts/validate_learning_log.py
 
       - name: Validate zero-cost RNZ archive policy
-        run: python3 scripts/rnz_archive.py policy
+        run: python scripts/rnz_archive.py policy
 
       - name: Run offline RNZ archive tests
-        run: python3 -m unittest tests.test_rnz_archive
+        run: python -m unittest tests.test_python_runtime_policy tests.test_rnz_archive
 
       - name: Install Cargo LLVM Cov
         uses: taiki-e/install-action@v2

@@ -9,12 +9,14 @@ Includes an asynchronous Client library, a command-line interface tool, a Model 
 - **`crates/dnz-core`**: Core library engine mapping JSON models, caching search requests, and handling exponential backoff retries.
 - **`crates/dnz-cli`**: Command Line Interface (`dnz`) optimized for pipelines (JSON and Markdown output formatting).
 - **`crates/dnz-mcp`**: Stdio JSON-RPC MCP server exposing DigitalNZ search capabilities to LLM agents.
-- **`crates/dnz-python`**: Python bindings via PyO3/Maturin to import FFI speeds directly in Jupyter notebooks.
+- **`crates/dnz-python`**: Python 3.14-only bindings via PyO3/Maturin to import FFI speeds directly in Jupyter notebooks.
 - **`docs`**: Custom Astro documentation portal.
 
 ## Quickstart
 
 Run tasks and format environments using **Pixi**:
+
+Python 3.14 is the sole supported Python runtime for development, bindings, automation, and the RNZ transcription environment.
 
 ```bash
 # Build the workspace

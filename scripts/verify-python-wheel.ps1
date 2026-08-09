@@ -61,7 +61,7 @@ if (-not $SkipBuild) {
     if (-not $Python) {
         $candidatePythons = @(
             (Join-Path $repo ".pixi\envs\default\python.exe"),
-            (Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe")
+            (Join-Path $env:LOCALAPPDATA "Programs\Python\Python314\python.exe")
         )
         foreach ($candidate in $candidatePythons) {
             if (Test-Path -LiteralPath $candidate) {

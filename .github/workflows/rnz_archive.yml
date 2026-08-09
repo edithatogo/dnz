@@ -59,7 +59,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Enforce public repository and zero-cost policy
         id: preflight
@@ -109,7 +109,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Install pinned CPU transcription dependencies
         run: |
