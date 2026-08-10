@@ -1,12 +1,12 @@
 schema_version: 2
-last_updated_utc: 2026-08-02T00:00:00Z
-repository_head: 0430762
+last_updated_utc: 2026-08-10T00:00:00Z
+repository_head: 4608cd2
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
-active_track: T12
-active_slice: workflow-policy-and-maintainer-context
-status: in_progress
+active_track: T11
+active_slice: external-registry-acceptance
+status: blocked
 
 track_status:
   T00: complete
@@ -21,7 +21,7 @@ track_status:
   T09: complete
   T10: complete
   T11: blocked
-  T12: in_progress
+  T12: complete
 
 verified_gates:
   - cargo fmt --all -- --check
@@ -96,7 +96,7 @@ completed_tracks:
   - T09
   - T10
 blocked_tracks: [T11]
-in_progress_tracks: [T12]
+in_progress_tracks: []
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
@@ -135,3 +135,4 @@ notes:
   - The bounded mutation lane was attempted twice and could not complete the unmutated workspace baseline within the local window; no mutation score is claimed. CI or a host with a working complete GNU/MSVC toolchain is required.
   - RNZ monthly Zenodo run 30687409986 failed because the publish job did not hydrate the digitalnz submodule; the local workflow now uses recursive submodule checkout and an explicit metadata presence check. Hosted confirmation remains gated on commit/push.
   - Hosted hardening run 30755301583 passed for commit 13ad4a3c: Rust, MSRV, OpenAPI drift, container smoke, audit/licenses/secrets/SBOM, and Python/MCP/package checks all passed; opt-in live API smoke remained skipped.
+  - T12 hosted run 30773596219 passed for commit 4608cd27: bounded mutation, workflow policy, registry metadata, Rust, MSRV, OpenAPI, container, security, packaging, and adapter checks all passed; live API smoke remained skipped. T12 is complete; T11 remains blocked on external registry/DOI acceptance.
