@@ -1,6 +1,6 @@
 schema_version: 2
-last_updated_utc: 2026-08-10T00:00:00Z
-repository_head: 4608cd2
+last_updated_utc: 2026-08-10T12:08:05Z
+repository_head: 9bf730f41118d2c4c1c23f0b96d76337d0c9cadb
 branch: codex/dnz-modernisation
 
 # Canonical status is recorded here; definitions live in manifest.yaml.
@@ -112,7 +112,7 @@ latest_evidence:
   - conductor/evidence/2026-07-15-t09-evidence-pack.md
   - conductor/evidence/2026-07-16-t10-hardening.md
   - conductor/evidence/2026-08-02-t11-t12-inventory.md
-latest_handoff: conductor/handoff.md
+latest_handoff: conductor/evidence/2026-08-02-t11-t12-inventory.md
 notes:
   - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
   - state.yaml is the sole source for current status, blockers, verification, and handoff state.
