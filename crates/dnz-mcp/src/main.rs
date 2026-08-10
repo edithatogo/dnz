@@ -512,8 +512,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let client = Client::new("test-key")
-            .with_base_url(server.uri());
+        let client = Client::new("test-key").with_base_url(server.uri());
         let response = handle_request(
             &request(
                 "tools/call",
@@ -567,8 +566,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let client = Client::new("test-key")
-            .with_base_url(server.uri());
+        let client = Client::new("test-key").with_base_url(server.uri());
         let response = handle_request(
             &request(
                 "tools/call",
