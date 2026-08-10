@@ -513,8 +513,7 @@ mod tests {
             .await;
 
         let client = Client::new("test-key")
-            .with_base_url(server.uri())
-            .with_legacy_query_key_auth();
+            .with_base_url(server.uri());
         let response = handle_request(
             &request(
                 "tools/call",
@@ -569,8 +568,7 @@ mod tests {
             .await;
 
         let client = Client::new("test-key")
-            .with_base_url(server.uri())
-            .with_legacy_query_key_auth();
+            .with_base_url(server.uri());
         let response = handle_request(
             &request(
                 "tools/call",
