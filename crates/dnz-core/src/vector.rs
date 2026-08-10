@@ -68,12 +68,16 @@ pub async fn ensure_embedding_model(
     std::fs::create_dir_all(cache_dir)?;
 
     validate_model_filename(&model.filename)?;
+    validate_model_url(&model.url)?;
     let model_path = cache_dir.join(&model.filename);
     if model_path.is_file() {
         return Ok(model_path);
     }
 
-    let response = reqwest::get(&model.url).await?;
+    let http_client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+    let response = http_client.get(&model.url).send().await?;
     let status = response.status();
     if !status.is_success() {
         return Err(anyhow::anyhow!(
@@ -137,14 +141,56 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 #[derive(Default, Debug, Clone)]
 pub struct MemoryVectorStore {
     vectors: Vec<DocumentVector>,
+    dimension: Option<usize>,
+}
+
+fn validate_model_url(value: &str) -> anyhow::Result<()> {
+    let url = reqwest::Url::parse(value)
+        .map_err(|_| anyhow::anyhow!("embedding model URL must be a valid HTTPS URL"))?;
+    if url.scheme() == "https" {
+        return Ok(());
+    }
+
+    let is_loopback_http = url.scheme() == "http"
+        && url
+            .host_str()
+            .is_some_and(|host| matches!(host, "127.0.0.1" | "localhost" | "::1"));
+    if is_loopback_http {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "embedding model URL must use HTTPS; HTTP is allowed only for loopback tests"
+        ))
+    }
 }
 
 impl VectorStore for MemoryVectorStore {
     fn insert(&mut self, record_id: &str, embedding: &[f32]) -> anyhow::Result<()> {
-        self.vectors.push(DocumentVector {
+        if let Some(dimension) = self.dimension {
+            if dimension != embedding.len() {
+                return Err(anyhow::anyhow!(
+                    "embedding dimension {} does not match store dimension {}",
+                    embedding.len(),
+                    dimension
+                ));
+            }
+        } else {
+            self.dimension = Some(embedding.len());
+        }
+
+        let vector = DocumentVector {
             record_id: record_id.to_string(),
             embedding: embedding.to_vec(),
-        });
+        };
+        if let Some(existing) = self
+            .vectors
+            .iter_mut()
+            .find(|candidate| candidate.record_id == record_id)
+        {
+            *existing = vector;
+        } else {
+            self.vectors.push(vector);
+        }
         Ok(())
     }
 
@@ -267,6 +313,26 @@ mod tests {
     }
 
     #[test]
+    fn test_memory_store_upserts_existing_record_id() {
+        let mut store = MemoryVectorStore::default();
+        store.insert("rec_1", &[1.0, 0.0]).unwrap();
+        store.insert("rec_1", &[0.0, 1.0]).unwrap();
+
+        assert_eq!(store.get("rec_1").unwrap(), Some(vec![0.0, 1.0]));
+        assert_eq!(store.query_similarity(&[0.0, 1.0], 10).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_memory_store_rejects_dimension_changes() {
+        let mut store = MemoryVectorStore::default();
+        store.insert("rec_1", &[1.0, 0.0]).unwrap();
+
+        let error = store.insert("rec_2", &[1.0, 0.0, 0.0]).unwrap_err();
+        assert!(error.to_string().contains("embedding dimension 3"));
+        assert!(store.get("rec_2").unwrap().is_none());
+    }
+
+    #[test]
     fn test_memory_store_query_similarity_top_k() {
         let mut store = MemoryVectorStore::default();
         store.insert("rec_a", &[1.0, 0.0]).unwrap();
@@ -359,6 +425,19 @@ mod tests {
 
         assert!(err.to_string().contains("single safe path component"));
 
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn ensure_embedding_model_rejects_remote_plaintext_http() {
+        let dir = temp_model_dir("insecure-url");
+        let model = EmbeddingModelDownload::new("model.bin", "http://example.com/model.bin");
+
+        let err = ensure_embedding_model(&dir, &model)
+            .await
+            .expect_err("remote plaintext model URL should be rejected");
+
+        assert!(err.to_string().contains("must use HTTPS"));
         let _ = std::fs::remove_dir_all(dir);
     }
 }

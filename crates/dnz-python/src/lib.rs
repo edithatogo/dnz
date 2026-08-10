@@ -1,9 +1,21 @@
 //! PyO3 FFI wrapper exposing dnz-core client to Python.
 
 use dnz_core::Client;
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use std::collections::HashMap;
+use std::sync::OnceLock;
+
+static PYTHON_RUNTIME: OnceLock<Result<tokio::runtime::Runtime, String>> = OnceLock::new();
+
+fn python_runtime() -> PyResult<&'static tokio::runtime::Runtime> {
+    match PYTHON_RUNTIME
+        .get_or_init(|| tokio::runtime::Runtime::new().map_err(|error| error.to_string()))
+    {
+        Ok(runtime) => Ok(runtime),
+        Err(error) => Err(PyRuntimeError::new_err(error.clone())),
+    }
+}
 
 /// Python wrapper around the native dnz-core Client.
 #[pyclass]
@@ -29,11 +41,36 @@ impl PyClient {
             page: 1,
             per_page: 20,
             fields: Vec::new(),
+            facets: Vec::new(),
+            facets_page: None,
+            facets_per_page: None,
+            geo_bbox: None,
+            extra_params: Vec::new(),
             sort: None,
             direction: None,
             and_filters: HashMap::new(),
             or_filters: HashMap::new(),
             without_filters: HashMap::new(),
+        }
+    }
+
+    /// Set a record ID and return a metadata builder.
+    pub fn record(&self, id: String) -> PyRecordBuilder {
+        PyRecordBuilder {
+            client: self.inner.clone(),
+            id,
+            fields: Vec::new(),
+        }
+    }
+
+    /// Set a record ID and return a More Like This builder.
+    pub fn more_like_this(&self, id: String) -> PyMoreLikeThisBuilder {
+        PyMoreLikeThisBuilder {
+            client: self.inner.clone(),
+            id,
+            page: 1,
+            per_page: 20,
+            fields: Vec::new(),
         }
     }
 }
@@ -46,6 +83,11 @@ pub struct PyQueryBuilder {
     page: u32,
     per_page: u32,
     fields: Vec<String>,
+    facets: Vec<String>,
+    facets_page: Option<u32>,
+    facets_per_page: Option<u32>,
+    geo_bbox: Option<[f64; 4]>,
+    extra_params: Vec<(String, String)>,
     sort: Option<String>,
     direction: Option<String>,
     and_filters: HashMap<String, Vec<String>>,
@@ -68,6 +110,39 @@ impl PyQueryBuilder {
     /// Restrict the fields returned in the result records.
     pub fn fields(&mut self, fields: Vec<String>) {
         self.fields = fields;
+    }
+
+    /// Request facet aggregates for the selected fields.
+    pub fn facets(&mut self, facets: Vec<String>) {
+        self.facets = facets;
+    }
+
+    /// Set the facet page index.
+    pub fn facets_page(&mut self, page: u32) {
+        self.facets_page = Some(page);
+    }
+
+    /// Set the facet page size.
+    pub fn facets_per_page(&mut self, per_page: u32) {
+        self.facets_per_page = Some(per_page);
+    }
+
+    /// Set a north, west, south, east geographic bounding box.
+    pub fn geo_bbox(&mut self, bbox: Vec<f64>) -> PyResult<()> {
+        let values: [f64; 4] = bbox
+            .try_into()
+            .map_err(|_| PyValueError::new_err("geo_bbox should contain exactly four values"))?;
+        self.geo_bbox = Some(values);
+        Ok(())
+    }
+
+    /// Add one validated, non-sensitive query parameter.
+    pub fn extra_param(&mut self, key: String, value: String) -> PyResult<()> {
+        if key == "api_key" || key == "key" || key == "wild" {
+            return Err(PyValueError::new_err("protected extra parameter"));
+        }
+        self.extra_params.push((key, value));
+        Ok(())
     }
 
     /// Sort by field and direction.
@@ -94,8 +169,7 @@ impl PyQueryBuilder {
     /// Run the search query and return results as a JSON string.
     pub fn send(&self, py: Python<'_>) -> PyResult<String> {
         py.detach(|| {
-            let rt = tokio::runtime::Runtime::new()
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+            let runtime = python_runtime()?;
 
             let mut builder = self
                 .client
@@ -103,6 +177,24 @@ impl PyQueryBuilder {
                 .page(self.page)
                 .per_page(self.per_page)
                 .fields(self.fields.clone());
+
+            for facet in &self.facets {
+                builder = builder.facet(facet.clone());
+            }
+            if let Some(page) = self.facets_page {
+                builder = builder.facets_page(page);
+            }
+            if let Some(per_page) = self.facets_per_page {
+                builder = builder.facets_per_page(per_page);
+            }
+            if let Some([north, west, south, east]) = self.geo_bbox {
+                builder = builder.geo_bbox(north, west, south, east);
+            }
+            for (key, value) in &self.extra_params {
+                builder = builder
+                    .try_extra_param(key.clone(), value.clone())
+                    .map_err(|error| PyValueError::new_err(error.to_string()))?;
+            }
 
             if let (Some(s), Some(d)) = (self.sort.clone(), self.direction.clone()) {
                 builder = builder.sort(s, d);
@@ -121,7 +213,7 @@ impl PyQueryBuilder {
             }
 
             let future = builder.send();
-            let response = rt
+            let response = runtime
                 .block_on(future)
                 .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
             let json_str = serde_json::to_string(&response)
@@ -129,12 +221,127 @@ impl PyQueryBuilder {
             Ok(json_str)
         })
     }
+
+    /// Return the normalized response as JSON, preserving the raw adapter contract.
+    pub fn send_raw(&self, py: Python<'_>) -> PyResult<String> {
+        self.send(py)
+    }
+
+    /// Return the normalized response as native Python dictionaries/lists.
+    pub fn send_typed(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let raw = self.send(py)?;
+        Ok(py.import("json")?.call_method1("loads", (raw,))?.unbind())
+    }
+}
+
+/// Python wrapper for record metadata lookup.
+#[pyclass]
+pub struct PyRecordBuilder {
+    client: Client,
+    id: String,
+    fields: Vec<String>,
+}
+
+#[pymethods]
+impl PyRecordBuilder {
+    /// Restrict the metadata fields returned for the record.
+    pub fn fields(&mut self, fields: Vec<String>) {
+        self.fields = fields;
+    }
+
+    /// Return the normalized record as JSON.
+    pub fn send(&self, py: Python<'_>) -> PyResult<String> {
+        py.detach(|| {
+            let runtime = python_runtime()?;
+            let response = runtime
+                .block_on(
+                    self.client
+                        .record(&self.id)
+                        .fields(self.fields.clone())
+                        .send(),
+                )
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+            serde_json::to_string(&response)
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+        })
+    }
+
+    /// Return the normalized record using the raw JSON adapter contract.
+    pub fn send_raw(&self, py: Python<'_>) -> PyResult<String> {
+        self.send(py)
+    }
+
+    /// Return the normalized record as a native Python dictionary.
+    pub fn send_typed(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let raw = self.send(py)?;
+        Ok(py.import("json")?.call_method1("loads", (raw,))?.unbind())
+    }
+}
+
+/// Python wrapper for related-record lookup.
+#[pyclass]
+pub struct PyMoreLikeThisBuilder {
+    client: Client,
+    id: String,
+    page: u32,
+    per_page: u32,
+    fields: Vec<String>,
+}
+
+#[pymethods]
+impl PyMoreLikeThisBuilder {
+    /// Set result page index.
+    pub fn page(&mut self, page: u32) {
+        self.page = page;
+    }
+
+    /// Set result count limit.
+    pub fn per_page(&mut self, per_page: u32) {
+        self.per_page = per_page;
+    }
+
+    /// Restrict the fields returned in related records.
+    pub fn fields(&mut self, fields: Vec<String>) {
+        self.fields = fields;
+    }
+
+    /// Return the normalized related-record response as JSON.
+    pub fn send(&self, py: Python<'_>) -> PyResult<String> {
+        py.detach(|| {
+            let runtime = python_runtime()?;
+            let response = runtime
+                .block_on(
+                    self.client
+                        .more_like_this(&self.id)
+                        .page(self.page)
+                        .per_page(self.per_page)
+                        .fields(self.fields.clone())
+                        .send(),
+                )
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+            serde_json::to_string(&response)
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+        })
+    }
+
+    /// Return the normalized response using the raw JSON adapter contract.
+    pub fn send_raw(&self, py: Python<'_>) -> PyResult<String> {
+        self.send(py)
+    }
+
+    /// Return the normalized response as native Python dictionaries/lists.
+    pub fn send_typed(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let raw = self.send(py)?;
+        Ok(py.import("json")?.call_method1("loads", (raw,))?.unbind())
+    }
 }
 
 /// The dnz python module definition.
 #[pymodule]
-fn dnz(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyClient>()?;
     m.add_class::<PyQueryBuilder>()?;
+    m.add_class::<PyRecordBuilder>()?;
+    m.add_class::<PyMoreLikeThisBuilder>()?;
     Ok(())
 }

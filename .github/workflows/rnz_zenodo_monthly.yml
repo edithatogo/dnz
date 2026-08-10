@@ -27,6 +27,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
+          submodules: recursive
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -79,6 +80,7 @@ jobs:
           ZENODO_TOKEN: ${{ secrets.ZENODO_TOKEN }}
         run: |
           set -euo pipefail
+          test -s digitalnz/.zenodo.json
           python - <<'PY'
           import hashlib, json, os
           from pathlib import Path

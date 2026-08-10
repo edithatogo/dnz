@@ -1,8 +1,71 @@
 //! Core client integration tests using wiremock
 
-use dnz_core::Client;
-use wiremock::matchers::{header, method, query_param};
+use dnz_core::{Client, DnzError};
+use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+
+#[tokio::test]
+async fn bounded_search_page_stream_fetches_on_demand() {
+    let mock_server = MockServer::start().await;
+    for (page, id) in [(1, "one"), (2, "two")] {
+        Mock::given(method("GET"))
+            .and(query_param("text", "kiwi"))
+            .and(query_param("page", page.to_string()))
+            .and(query_param("per_page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "search": {
+                    "result_count": 2,
+                    "results": [{"id": id, "title": id}],
+                    "facets": {}
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+    }
+
+    let mut pages = Client::unauthenticated()
+        .with_base_url(mock_server.uri())
+        .search_pages("kiwi")
+        .per_page(1)
+        .max_pages(2);
+
+    assert_eq!(
+        pages.next_page().await.unwrap().unwrap().search.results[0].id,
+        "one"
+    );
+    assert_eq!(
+        pages.next_page().await.unwrap().unwrap().search.results[0].id,
+        "two"
+    );
+    assert!(pages.next_page().await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn bounded_record_stream_yields_records_on_demand() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(query_param("text", "kiwi"))
+        .and(query_param("page", "1"))
+        .and(query_param("per_page", "2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "search": {
+                "result_count": 2,
+                "results": [{"id": "one", "title": "One"}, {"id": "two", "title": "Two"}],
+                "facets": {}
+            }
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let mut records = Client::unauthenticated()
+        .with_base_url(mock_server.uri())
+        .records("kiwi")
+        .per_page(2)
+        .max_records(1);
+
+    assert_eq!(records.next_record().await.unwrap().unwrap().id, "one");
+    assert!(records.next_record().await.unwrap().is_none());
+}
 
 #[tokio::test]
 async fn test_mock_search_request() {
@@ -44,6 +107,62 @@ async fn test_mock_search_request() {
         response.search.results[0].content_partner.as_ref().unwrap()[0],
         "Te Papa"
     );
+}
+
+#[tokio::test]
+async fn test_rss_search_fixture_is_normalized() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/records.rss"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(include_str!("fixtures/digitalnz-search.rss")),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let response = Client::unauthenticated()
+        .with_base_url(format!("{}/records.rss", mock_server.uri()))
+        .search("kiwi")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.search.result_count, 1);
+    assert_eq!(response.search.results[0].id, "41278482");
+}
+
+#[tokio::test]
+async fn xml_search_and_record_endpoints_use_verified_normalization() {
+    let mock_server = MockServer::start().await;
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<search><page type="integer">1</page><per-page type="integer">1</per-page>
+<result-count type="integer">1</result-count><results type="array">
+<result><id type="integer">42</id><title>XML item</title><subject>one</subject><subject>two</subject></result>
+</results><facets type="array"/></search>"#;
+
+    Mock::given(method("GET"))
+        .and(path("/records.xml"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(xml))
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/records/42.xml"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(xml))
+        .mount(&mock_server)
+        .await;
+
+    let base_url = format!("{}/records.xml", mock_server.uri());
+    let client = Client::unauthenticated().with_base_url(base_url);
+    let response = client.search("xml").send().await.unwrap();
+    assert_eq!(response.search.results[0].id, "42");
+    assert_eq!(
+        response.search.results[0].subject.as_ref().unwrap().len(),
+        2
+    );
+
+    let record = client.record("42").send().await.unwrap();
+    assert_eq!(record.title, "XML item");
 }
 
 #[tokio::test]
@@ -124,4 +243,172 @@ async fn test_mock_search_fields_and_excludes() {
 
     assert_eq!(response.search.results[0].id, "789");
     assert_eq!(response.search.results[0].title, "Short Item");
+}
+
+#[tokio::test]
+async fn test_record_metadata_normalizes_integer_id_and_unknown_fields() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/records/37757055.json"))
+        .and(header("Authentication-Token", "test_key"))
+        .and(query_param("fields", "title,source_url"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "search": {
+                "result_count": 1,
+                "results": [{
+                    "id": 37757055,
+                    "title": "Kauri tree photo",
+                    "source_url": "https://example.test/source",
+                    "provider_extension": {"preserved": true}
+                }]
+            }
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let record = Client::new("test_key")
+        .with_base_url(mock_server.uri())
+        .record("37757055")
+        .fields(vec!["title".to_string(), "source_url".to_string()])
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(record.id, "37757055");
+    assert_eq!(record.title, "Kauri tree photo");
+    assert_eq!(record.extra_fields["provider_extension"]["preserved"], true);
+}
+
+#[tokio::test]
+async fn test_more_like_this_builds_endpoint_and_normalizes_flat_results() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/records/12/more_like_this.json"))
+        .and(header("Authentication-Token", "test_key"))
+        .and(query_param("page", "2"))
+        .and(query_param("per_page", "5"))
+        .and(query_param("fields", "title,subject"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "result_count": 1,
+            "records": [{"id": 99, "title": "Similar item"}]
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let response = Client::new("test_key")
+        .with_base_url(mock_server.uri())
+        .more_like_this("12")
+        .page(2)
+        .per_page(5)
+        .fields(vec!["title".to_string(), "subject".to_string()])
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.search.result_count, 1);
+    assert_eq!(response.search.results[0].id, "99");
+}
+
+#[tokio::test]
+async fn record_and_mlt_http_statuses_remain_structured() {
+    let mock_server = MockServer::start().await;
+    for status in [400, 403, 404, 429, 500, 502, 503] {
+        Mock::given(method("GET"))
+            .and(path(format!("/records/{status}.json")))
+            .respond_with(
+                ResponseTemplate::new(status)
+                    .insert_header("Retry-After", "999")
+                    .set_body_string("provider details stay out of the stable error"),
+            )
+            .mount(&mock_server)
+            .await;
+    }
+    Mock::given(method("GET"))
+        .and(path("/records/400/more_like_this.json"))
+        .respond_with(ResponseTemplate::new(400).set_body_string("bad mlt request"))
+        .mount(&mock_server)
+        .await;
+    for status in [400, 403, 404, 429, 500, 502, 503] {
+        let error = Client::unauthenticated()
+            .with_base_url(mock_server.uri())
+            .record(status.to_string())
+            .send()
+            .await
+            .expect_err("record status should be structured");
+        let structured = error.downcast_ref::<DnzError>().unwrap();
+        assert_eq!(structured.status(), Some(status));
+        assert_eq!(
+            structured.retry_after(),
+            Some(std::time::Duration::from_secs(60))
+        );
+        assert!(!error
+            .to_string()
+            .contains("provider details stay out of the stable error"));
+    }
+
+    let error = Client::unauthenticated()
+        .with_base_url(mock_server.uri())
+        .more_like_this("400")
+        .send()
+        .await
+        .expect_err("MLT status should be structured");
+    assert_eq!(
+        error.downcast_ref::<DnzError>().unwrap().status(),
+        Some(400)
+    );
+}
+
+#[tokio::test]
+async fn record_decode_failures_are_stable_and_non_leaky() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/records/bad.json"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("not-json"))
+        .mount(&mock_server)
+        .await;
+
+    let error = Client::new("decode-secret")
+        .with_base_url(mock_server.uri())
+        .record("bad")
+        .send()
+        .await
+        .expect_err("malformed record payload should fail decoding");
+    assert!(matches!(
+        error.downcast_ref::<DnzError>(),
+        Some(&DnzError::Decode)
+    ));
+    assert!(!error.to_string().contains("decode-secret"));
+}
+
+#[tokio::test]
+async fn http_errors_are_structured_and_secret_safe() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(
+            ResponseTemplate::new(404)
+                .insert_header("Retry-After", "999")
+                .set_body_string("private-token-should-not-escape"),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let error = Client::new("private-token-should-not-escape")
+        .with_base_url(mock_server.uri())
+        .search("missing")
+        .send()
+        .await
+        .expect_err("404 should be returned as a structured error");
+    let structured = error
+        .downcast_ref::<DnzError>()
+        .expect("error should preserve DnzError");
+    assert_eq!(structured.status(), Some(404));
+    // Retry-After is bounded by the client contract, so the deliberately
+    // excessive fixture value is preserved at the 60-second safety cap.
+    assert_eq!(
+        structured.retry_after(),
+        Some(std::time::Duration::from_secs(60))
+    );
+    assert!(!error
+        .to_string()
+        .contains("private-token-should-not-escape"));
 }

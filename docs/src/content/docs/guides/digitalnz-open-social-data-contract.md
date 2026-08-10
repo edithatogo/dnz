@@ -23,6 +23,7 @@ title: DigitalNZ and Open Social Data Contract
 - Catalog and search workflows
 - Quality reports and validation
 - Parquet export and dataset normalization
+- Optional GeoParquet export for records with verified WGS84 point coordinates; invalid or missing coordinates are omitted and the output carries GeoParquet 1.1 WKB metadata.
 
 ## Stable Surfaces
 

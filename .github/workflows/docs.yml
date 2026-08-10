@@ -16,12 +16,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           submodules: recursive
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
 
@@ -29,7 +29,7 @@ jobs:
         run: npm install --prefix docs --no-audit --no-fund
 
       - name: Check docs
-        run: npm run docs:check
+        run: npm run check --prefix docs
 
       - name: Build docs
-        run: npm run docs:build
+        run: npm run build --prefix docs

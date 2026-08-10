@@ -5,14 +5,17 @@ use std::collections::HashSet;
 
 /// Prune near-duplicate records based on exact title matching or ID uniqueness.
 pub fn deduplicate_records(records: &[Record]) -> Vec<Record> {
+    let mut seen_ids = HashSet::new();
     let mut seen_titles = HashSet::new();
     let mut unique_records = Vec::new();
 
     for rec in records {
-        // Standardize title for comparison
+        if !rec.id.is_empty() && !seen_ids.insert(rec.id.clone()) {
+            continue;
+        }
+
         let normalized_title = rec.title.to_lowercase().trim().to_string();
-        if !normalized_title.is_empty() && !seen_titles.contains(&normalized_title) {
-            seen_titles.insert(normalized_title);
+        if normalized_title.is_empty() || seen_titles.insert(normalized_title) {
             unique_records.push(rec.clone());
         }
     }
@@ -31,19 +34,25 @@ pub fn to_rag_xml(records: &[Record]) -> String {
             .as_ref()
             .map(|v| v.join(", "))
             .unwrap_or_default();
-        output.push_str(&format!("  <document id=\"{}\">\n", rec.id));
-        output.push_str(&format!("    <title>{}</title>\n", rec.title));
+        output.push_str(&format!("  <document id=\"{}\">\n", xml_escape(&rec.id)));
+        output.push_str(&format!("    <title>{}</title>\n", xml_escape(&rec.title)));
         if !partners.is_empty() {
             output.push_str(&format!(
                 "    <content_partner>{}</content_partner>\n",
-                partners
+                xml_escape(&partners)
             ));
         }
         if let Some(desc) = &rec.description {
-            output.push_str(&format!("    <description>{}</description>\n", desc.trim()));
+            output.push_str(&format!(
+                "    <description>{}</description>\n",
+                xml_escape(desc.trim())
+            ));
         }
         if let Some(dates) = &rec.date {
-            output.push_str(&format!("    <dates>{}</dates>\n", dates.join(", ")));
+            output.push_str(&format!(
+                "    <dates>{}</dates>\n",
+                xml_escape(&dates.join(", "))
+            ));
         }
         output.push_str("  </document>\n");
     }
@@ -54,18 +63,22 @@ pub fn to_rag_xml(records: &[Record]) -> String {
 
 /// Compile a chronological timeline of records.
 pub fn generate_chronological_timeline(records: &[Record]) -> String {
-    let mut timeline_entries: Vec<(String, String)> = Vec::new();
+    let mut timeline_entries: Vec<(Option<i64>, String, String)> = Vec::new();
 
     for rec in records {
         if let Some(dates) = &rec.date {
             if let Some(first_date) = dates.first() {
-                timeline_entries.push((first_date.clone(), rec.title.clone()));
+                timeline_entries.push((
+                    parse_date_key(first_date),
+                    first_date.clone(),
+                    rec.title.clone(),
+                ));
             }
         }
     }
 
     // Sort entries chronologically by date string
-    timeline_entries.sort_by(|a, b| a.0.cmp(&b.0));
+    timeline_entries.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
 
     let mut markdown = String::new();
     markdown.push_str("# Historical Research Timeline\n\n");
@@ -74,17 +87,17 @@ pub fn generate_chronological_timeline(records: &[Record]) -> String {
         return markdown;
     }
 
-    for (date, title) in timeline_entries {
+    for (_, date, title) in timeline_entries {
         markdown.push_str(&format!("- **{}**: {}\n", date, title));
     }
 
     markdown
 }
 
-/// Generate MLA/APA style reference citations for heritage archives.
+/// Generate generic, source-linked reference entries for heritage archives.
 pub fn generate_citations(records: &[Record]) -> String {
     let mut output = String::new();
-    output.push_str("# Heritage Document Citations\n\n");
+    output.push_str("# Heritage Document References (generic format)\n\n");
 
     for rec in records {
         let partner = rec
@@ -106,6 +119,24 @@ pub fn generate_citations(records: &[Record]) -> String {
     }
 
     output
+}
+
+fn xml_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+fn parse_date_key(value: &str) -> Option<i64> {
+    let digits: String = value.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits.len() >= 4 {
+        digits[..4].parse().ok()
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

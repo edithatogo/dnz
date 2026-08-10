@@ -1,8 +1,12 @@
 //! Client and query builder implementations for the DigitalNZ API.
 
-use crate::cache::PersistentCache;
+use crate::cache::{CacheProvenance, PersistentCache};
 use crate::errors::DnzError;
-use crate::models::SearchResponse;
+use crate::models::{
+    normalize_record_response, normalize_rss_record_response, normalize_rss_search_response,
+    normalize_search_response, normalize_xml_record_response, normalize_xml_search_response,
+    Record, SearchResponse,
+};
 use reqwest::Client as HttpClient;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -22,6 +26,9 @@ pub struct Client {
     // Thread-safe query cache
     cache: Arc<Mutex<HashMap<String, SearchResponse>>>,
     persistent_cache: Option<PersistentCache>,
+    cache_ttl: Option<Duration>,
+    cache_max_entries: Option<usize>,
+    offline: bool,
 }
 
 impl Client {
@@ -37,6 +44,9 @@ impl Client {
                 .expect("default HTTP client configuration is valid"),
             cache: Arc::new(Mutex::new(HashMap::new())),
             persistent_cache: None,
+            cache_ttl: None,
+            cache_max_entries: None,
+            offline: false,
         }
     }
 
@@ -86,6 +96,24 @@ impl Client {
         Ok(self)
     }
 
+    /// Reject persistent cache entries older than `ttl`.
+    pub fn with_cache_ttl(mut self, ttl: Duration) -> Self {
+        self.cache_ttl = Some(ttl);
+        self
+    }
+
+    /// Bound persistent cache growth by retaining only the newest entries.
+    pub fn with_cache_max_entries(mut self, max_entries: usize) -> Self {
+        self.cache_max_entries = Some(max_entries);
+        self
+    }
+
+    /// Prevent network requests; queries must be satisfied by cache entries.
+    pub fn offline(mut self) -> Self {
+        self.offline = true;
+        self
+    }
+
     /// Clear cache entries.
     pub fn clear_cache(&self) {
         if let Ok(mut c) = self.cache.lock() {
@@ -101,6 +129,265 @@ impl Client {
     /// Create a search query builder.
     pub fn search(&self, text: impl Into<String>) -> QueryBuilder {
         QueryBuilder::new(self.clone(), text.into())
+    }
+
+    /// Create a bounded, caller-driven stream of search pages.
+    ///
+    /// Pages are fetched only when [`SearchPageStream::next_page`] is called,
+    /// so callers control backpressure and can cancel by dropping the stream.
+    pub fn search_pages(&self, text: impl Into<String>) -> SearchPageStream {
+        SearchPageStream {
+            client: self.clone(),
+            text: text.into(),
+            next_page: 1,
+            per_page: 20,
+            max_pages: None,
+            finished: false,
+        }
+    }
+
+    /// Create a lazy record stream backed by bounded page requests.
+    pub fn records(&self, text: impl Into<String>) -> RecordStream {
+        RecordStream {
+            pages: self.search_pages(text),
+            current: Vec::new(),
+            max_records: None,
+            emitted: 0,
+        }
+    }
+
+    /// Create a record-by-ID metadata builder.
+    pub fn record(&self, record_id: impl Into<String>) -> RecordQueryBuilder {
+        RecordQueryBuilder {
+            client: self.clone(),
+            record_id: record_id.into(),
+            fields: Vec::new(),
+        }
+    }
+
+    /// Create a More Like This builder for a record ID.
+    pub fn more_like_this(&self, record_id: impl Into<String>) -> MoreLikeThisQueryBuilder {
+        MoreLikeThisQueryBuilder {
+            client: self.clone(),
+            record_id: record_id.into(),
+            page: 1,
+            per_page: 20,
+            fields: Vec::new(),
+            filters: Vec::new(),
+        }
+    }
+}
+
+/// Lazy page stream for bounded search harvesting.
+#[derive(Debug, Clone)]
+pub struct SearchPageStream {
+    client: Client,
+    text: String,
+    next_page: u32,
+    per_page: u32,
+    max_pages: Option<u32>,
+    finished: bool,
+}
+
+impl SearchPageStream {
+    /// Set the requested page size, clamped to the API maximum.
+    pub fn per_page(mut self, per_page: u32) -> Self {
+        self.per_page = per_page.min(100);
+        self
+    }
+
+    /// Set a hard upper bound on the number of pages fetched.
+    pub fn max_pages(mut self, max_pages: u32) -> Self {
+        self.max_pages = Some(max_pages);
+        self
+    }
+
+    /// Fetch the next page, returning `None` when the configured limit or the
+    /// provider's empty page marks the stream complete.
+    pub async fn next_page(&mut self) -> anyhow::Result<Option<SearchResponse>> {
+        if self.finished || self.max_pages.is_some_and(|limit| self.next_page > limit) {
+            self.finished = true;
+            return Ok(None);
+        }
+
+        let response = self
+            .client
+            .search(&self.text)
+            .page(self.next_page)
+            .per_page(self.per_page)
+            .send()
+            .await?;
+        self.next_page = self.next_page.saturating_add(1);
+        if response.search.results.is_empty() {
+            self.finished = true;
+        }
+        Ok(Some(response))
+    }
+}
+
+/// Lazy record stream that applies backpressure at individual record reads.
+#[derive(Debug, Clone)]
+pub struct RecordStream {
+    pages: SearchPageStream,
+    current: Vec<Record>,
+    max_records: Option<u32>,
+    emitted: u32,
+}
+
+impl RecordStream {
+    /// Set a hard upper bound on records yielded by this stream.
+    pub fn max_records(mut self, max_records: u32) -> Self {
+        self.max_records = Some(max_records);
+        self
+    }
+
+    /// Set the page size used by the underlying lazy page stream.
+    pub fn per_page(mut self, per_page: u32) -> Self {
+        self.pages = self.pages.per_page(per_page);
+        self
+    }
+
+    /// Fetch and yield one record, returning `None` at the configured limit or end.
+    pub async fn next_record(&mut self) -> anyhow::Result<Option<Record>> {
+        if self.max_records.is_some_and(|limit| self.emitted >= limit) {
+            return Ok(None);
+        }
+        loop {
+            if let Some(record) = self.current.pop() {
+                self.emitted = self.emitted.saturating_add(1);
+                return Ok(Some(record));
+            }
+            let Some(page) = self.pages.next_page().await? else {
+                return Ok(None);
+            };
+            self.current = page.search.results;
+            self.current.reverse();
+        }
+    }
+}
+
+/// Builder for the DigitalNZ v3 get-metadata endpoint.
+#[derive(Debug, Clone)]
+pub struct RecordQueryBuilder {
+    client: Client,
+    record_id: String,
+    fields: Vec<String>,
+}
+
+impl RecordQueryBuilder {
+    /// Restrict the metadata fields returned by the provider.
+    pub fn fields(mut self, fields: Vec<String>) -> Self {
+        self.fields = fields;
+        self
+    }
+
+    /// Fetch and normalize one record from a verified response shape.
+    pub async fn send(self) -> anyhow::Result<Record> {
+        let endpoint = record_endpoint_url(&self.client.base_url, &self.record_id)?;
+        let format = response_format(&endpoint)?;
+        let mut params = Vec::new();
+        if !self.fields.is_empty() {
+            params.push(("fields", self.fields.join(",")));
+        }
+
+        let mut request = self.client.http_client.get(endpoint).query(&params);
+        if !self.client.api_key.is_empty() && !self.client.legacy_query_key_auth {
+            request = request.header("Authentication-Token", &self.client.api_key);
+        }
+
+        let response = request
+            .send()
+            .await
+            .map_err(|_| anyhow::Error::new(DnzError::Transport))?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(anyhow::Error::new(DnzError::HttpStatus {
+                status: status.as_u16(),
+                retry_after: retry_after_delay(response.headers()),
+            }));
+        }
+
+        let payload = response
+            .bytes()
+            .await
+            .map_err(|err| anyhow::Error::new(DnzError::Decode).context(err))?;
+        decode_record_response(format, &payload)
+    }
+}
+
+/// Builder for the documented More Like This endpoint.
+#[derive(Debug, Clone)]
+pub struct MoreLikeThisQueryBuilder {
+    client: Client,
+    record_id: String,
+    page: u32,
+    per_page: u32,
+    fields: Vec<String>,
+    filters: Vec<FilterExpr>,
+}
+
+impl MoreLikeThisQueryBuilder {
+    pub fn page(mut self, page: u32) -> Self {
+        self.page = page.max(1);
+        self
+    }
+
+    pub fn per_page(mut self, per_page: u32) -> Self {
+        self.per_page = per_page.min(100);
+        self
+    }
+
+    pub fn fields(mut self, fields: Vec<String>) -> Self {
+        self.fields = fields;
+        self
+    }
+
+    pub fn try_filter(mut self, filter: FilterExpr) -> anyhow::Result<Self> {
+        filter.validate()?;
+        self.filters.push(filter);
+        Ok(self)
+    }
+
+    pub async fn send(self) -> anyhow::Result<SearchResponse> {
+        let endpoint = more_like_this_endpoint_url(&self.client.base_url, &self.record_id)?;
+        let format = response_format(&endpoint)?;
+        let mut params = vec![
+            ("page", self.page.to_string()),
+            ("per_page", self.per_page.to_string()),
+        ];
+        if !self.fields.is_empty() {
+            params.push(("fields", self.fields.join(",")));
+        }
+        let mut filter_params = Vec::new();
+        for filter in &self.filters {
+            filter.append_params(&[], &mut filter_params);
+        }
+
+        let mut request = self
+            .client
+            .http_client
+            .get(endpoint)
+            .query(&params)
+            .query(&filter_params);
+        if !self.client.api_key.is_empty() && !self.client.legacy_query_key_auth {
+            request = request.header("Authentication-Token", &self.client.api_key);
+        }
+        let response = request
+            .send()
+            .await
+            .map_err(|_| anyhow::Error::new(DnzError::Transport))?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(anyhow::Error::new(DnzError::HttpStatus {
+                status: status.as_u16(),
+                retry_after: retry_after_delay(response.headers()),
+            }));
+        }
+        let payload = response
+            .bytes()
+            .await
+            .map_err(|err| anyhow::Error::new(DnzError::Decode).context(err))?;
+        decode_search_response(format, &payload)
     }
 }
 
@@ -171,6 +458,46 @@ mod tests {
     }
 
     #[test]
+    fn canonical_query_params_encode_nested_filters_and_repeated_values() {
+        let builder = Client::unauthenticated()
+            .search("te reo & 日本語")
+            .per_page(0)
+            .try_extra_param("format", "json&csv")
+            .unwrap()
+            .try_filter(FilterExpr::all(vec![
+                FilterExpr::field("title", vec!["A&B".into(), "第二".into()]),
+                FilterExpr::any(vec![FilterExpr::field("category", vec!["Images".into()])]),
+            ]))
+            .unwrap();
+
+        let params = builder.query_params().unwrap();
+        assert!(params.contains(&("per_page".into(), "0".into())));
+        assert!(params.contains(&("and[title][]".into(), "A&B".into())));
+        assert!(params.contains(&("and[title][]".into(), "第二".into())));
+        assert!(params.contains(&("and[or][category][]".into(), "Images".into())));
+        assert!(params.contains(&("format".into(), "json&csv".into())));
+        assert!(params.windows(2).all(|pair| pair[0] <= pair[1]));
+    }
+
+    #[test]
+    fn query_contract_rejects_antimeridian_and_unsafe_extra_keys() {
+        let client = Client::unauthenticated();
+        assert!(client
+            .search("a")
+            .try_geo_bbox(10.0, 170.0, -10.0, -170.0)
+            .is_err());
+        assert!(client.search("a").try_extra_param("", "value").is_err());
+        assert!(client
+            .search("a")
+            .try_extra_param("format?x", "json")
+            .is_err());
+        assert!(client
+            .search("a")
+            .try_filter(FilterExpr::field("bad[field]", vec!["x".into()]))
+            .is_err());
+    }
+
+    #[test]
     fn test_clear_cache() {
         let client = Client::new("test");
         // Send a search (no actual HTTP call will be made with a fake API key,
@@ -221,6 +548,18 @@ mod tests {
         let result2 = client.search("kauri").send().await.unwrap();
         assert_eq!(result2.search.result_count, 1);
         assert_eq!(result2.search.results[0].id, "1");
+    }
+
+    #[tokio::test]
+    async fn offline_mode_fails_without_a_cached_response() {
+        let error = Client::unauthenticated()
+            .offline()
+            .search("uncached")
+            .send()
+            .await
+            .expect_err("offline uncached query should fail");
+
+        assert!(error.to_string().contains("offline mode"));
     }
 
     #[tokio::test]
@@ -338,6 +677,29 @@ mod tests {
     }
 
     #[test]
+    fn cache_namespace_differs_between_credentials_without_revealing_them() {
+        let first = Client::new("first-secret").search("kauri");
+        let second = Client::new("second-secret").search("kauri");
+        let params = vec![("text".to_string(), "kauri".to_string())];
+
+        let first_key = first.cache_key(&params);
+        let second_key = second.cache_key(&params);
+        assert_ne!(first_key, second_key);
+        assert!(!first_key.contains("first-secret"));
+        assert!(!second_key.contains("second-secret"));
+    }
+
+    #[test]
+    fn retry_after_is_parsed_and_bounded() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(reqwest::header::RETRY_AFTER, "999".parse().unwrap());
+        assert_eq!(retry_after_delay(&headers), Some(Duration::from_secs(60)));
+
+        headers.insert(reqwest::header::RETRY_AFTER, "0".parse().unwrap());
+        assert_eq!(retry_after_delay(&headers), Some(Duration::ZERO));
+    }
+
+    #[test]
     fn test_query_builder_url_construction() {
         let client = Client::new("test_key");
 
@@ -424,7 +786,104 @@ pub struct QueryBuilder {
     and_filters: HashMap<String, Vec<String>>,
     or_filters: HashMap<String, Vec<String>>,
     without_filters: HashMap<String, Vec<String>>,
+    filter_exprs: Vec<FilterExpr>,
     use_cache: bool,
+}
+
+/// Boolean expression used to serialize nested DigitalNZ filters safely.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FilterExpr {
+    /// Require every child expression.
+    All(Vec<FilterExpr>),
+    /// Require at least one child expression.
+    Any(Vec<FilterExpr>),
+    /// Exclude the child expression.
+    Not(Box<FilterExpr>),
+    /// Match one or more values for a field.
+    Field { field: String, values: Vec<String> },
+}
+
+impl FilterExpr {
+    pub fn field(field: impl Into<String>, values: Vec<String>) -> Self {
+        Self::Field {
+            field: field.into(),
+            values,
+        }
+    }
+
+    pub fn all(children: Vec<Self>) -> Self {
+        Self::All(children)
+    }
+
+    pub fn any(children: Vec<Self>) -> Self {
+        Self::Any(children)
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn not(child: Self) -> Self {
+        Self::Not(Box::new(child))
+    }
+
+    fn validate(&self) -> anyhow::Result<()> {
+        match self {
+            Self::Field { field, .. }
+                if field.is_empty() || field.contains(['[', ']', '&', '=', '#', '?']) =>
+            {
+                anyhow::bail!("filter field is empty or contains unsafe characters")
+            }
+            Self::Field { .. } => Ok(()),
+            Self::All(children) | Self::Any(children) => {
+                if children.is_empty() {
+                    anyhow::bail!("boolean filter expression cannot be empty");
+                }
+                for child in children {
+                    child.validate()?;
+                }
+                Ok(())
+            }
+            Self::Not(child) => child.validate(),
+        }
+    }
+
+    fn append_params(&self, prefix: &[String], params: &mut Vec<(String, String)>) {
+        match self {
+            Self::Field { field, values } => {
+                let root = ["and".to_string()];
+                let prefix = if prefix.is_empty() { &root[..] } else { prefix };
+                let mut key = prefix[0].clone();
+                for component in &prefix[1..] {
+                    key.push('[');
+                    key.push_str(component);
+                    key.push(']');
+                }
+                key.push('[');
+                key.push_str(field);
+                key.push_str("][]");
+                for value in values {
+                    params.push((key.clone(), value.clone()));
+                }
+            }
+            Self::All(children) => {
+                for child in children {
+                    let mut next = prefix.to_vec();
+                    next.push("and".to_string());
+                    child.append_params(&next, params);
+                }
+            }
+            Self::Any(children) => {
+                for child in children {
+                    let mut next = prefix.to_vec();
+                    next.push("or".to_string());
+                    child.append_params(&next, params);
+                }
+            }
+            Self::Not(child) => {
+                let mut next = prefix.to_vec();
+                next.push("without".to_string());
+                child.append_params(&next, params);
+            }
+        }
+    }
 }
 
 impl QueryBuilder {
@@ -446,6 +905,7 @@ impl QueryBuilder {
             and_filters: HashMap::new(),
             or_filters: HashMap::new(),
             without_filters: HashMap::new(),
+            filter_exprs: Vec::new(),
             use_cache: true,
         }
     }
@@ -505,7 +965,10 @@ impl QueryBuilder {
         value: impl Into<String>,
     ) -> anyhow::Result<Self> {
         let key = key.into();
-        if is_protected_extra_param(&key) || key.contains('&') || key.contains('=') {
+        if key.is_empty()
+            || is_protected_extra_param(&key)
+            || key.contains(['&', '=', '#', '?', '[', ']'])
+        {
             anyhow::bail!("extra parameter is protected or unsafe: {key}");
         }
         self.extra_params.push((key, value.into()));
@@ -533,6 +996,7 @@ impl QueryBuilder {
             || !(-180.0..=180.0).contains(&w)
             || !(-180.0..=180.0).contains(&e)
             || n < s
+            || w > e
         {
             anyhow::bail!("invalid geographic bounding box");
         }
@@ -557,13 +1021,15 @@ impl QueryBuilder {
         self
     }
 
-    /// Execute the query asynchronously and return parsed search results.
-    pub async fn send(self) -> anyhow::Result<SearchResponse> {
-        if !self.client.base_url.starts_with("https://")
-            && !is_local_test_url(&self.client.base_url)
-        {
-            return Err(anyhow::anyhow!("DigitalNZ base URL must use HTTPS"));
-        }
+    /// Add a validated nested boolean filter expression.
+    pub fn try_filter(mut self, filter: FilterExpr) -> anyhow::Result<Self> {
+        filter.validate()?;
+        self.filter_exprs.push(filter);
+        Ok(self)
+    }
+
+    /// Build the canonical, repeated query parameter representation.
+    pub fn query_params(&self) -> anyhow::Result<Vec<(String, String)>> {
         let mut query_params = vec![
             ("text".to_string(), self.text.clone()),
             ("page".to_string(), self.page.to_string()),
@@ -573,11 +1039,9 @@ impl QueryBuilder {
         if self.client.legacy_query_key_auth && !self.client.api_key.is_empty() {
             query_params.push(("api_key".to_string(), self.client.api_key.clone()));
         }
-
         if !self.fields.is_empty() {
             query_params.push(("fields".to_string(), self.fields.join(",")));
         }
-
         if !self.facets.is_empty() {
             query_params.push(("facets".to_string(), self.facets.join(",")));
             query_params.push(("facets_page".to_string(), self.facets_page.to_string()));
@@ -592,52 +1056,61 @@ impl QueryBuilder {
                 ));
             }
         }
-
         query_params.extend(self.extra_params.iter().cloned());
-
         if let (Some(sort), Some(dir)) = (self.sort.clone(), self.direction.clone()) {
             query_params.push(("sort".to_string(), sort));
             query_params.push(("direction".to_string(), dir));
         }
-
         if let Some(bbox) = self.geo_bbox {
-            let bbox_str = format!("{},{},{},{}", bbox[0], bbox[1], bbox[2], bbox[3]);
-            query_params.push(("geo_bbox".to_string(), bbox_str));
+            query_params.push((
+                "geo_bbox".to_string(),
+                format!("{},{},{},{}", bbox[0], bbox[1], bbox[2], bbox[3]),
+            ));
         }
-
-        // Handle AND filters (e.g. and[content_partner][]=value)
-        for (field, values) in &self.and_filters {
-            for val in values {
-                query_params.push((format!("and[{}][]", field), val.clone()));
+        for (prefix, filters) in [
+            ("and", &self.and_filters),
+            ("or", &self.or_filters),
+            ("without", &self.without_filters),
+        ] {
+            let mut entries: Vec<_> = filters.iter().collect();
+            entries.sort_by_key(|(left, _)| (*left).clone());
+            for (field, values) in entries {
+                for value in values {
+                    query_params.push((format!("{prefix}[{field}][]"), value.clone()));
+                }
             }
         }
-
-        // Handle OR filters (e.g. or[category][]=value)
-        for (field, values) in &self.or_filters {
-            for val in values {
-                query_params.push((format!("or[{}][]", field), val.clone()));
-            }
+        for filter in &self.filter_exprs {
+            filter.validate()?;
+            filter.append_params(&[], &mut query_params);
         }
+        query_params.sort();
+        Ok(query_params)
+    }
 
-        // Handle WITHOUT filters (e.g. without[category][]=value)
-        for (field, values) in &self.without_filters {
-            for val in values {
-                query_params.push((format!("without[{}][]", field), val.clone()));
-            }
+    /// Execute the query asynchronously and return parsed search results.
+    pub async fn send(self) -> anyhow::Result<SearchResponse> {
+        if !self.client.base_url.starts_with("https://")
+            && !is_local_test_url(&self.client.base_url)
+        {
+            return Err(anyhow::anyhow!("DigitalNZ base URL must use HTTPS"));
         }
+        let query_params = self.query_params()?;
 
         // Generate cache key
         let cache_key = self.cache_key(&query_params);
 
         if self.use_cache {
-            if let Ok(c) = self.client.cache.lock() {
-                if let Some(cached_resp) = c.get(&cache_key) {
-                    debug!("Returning cached response for query");
-                    return Ok(cached_resp.clone());
+            if self.client.cache_ttl.is_none() {
+                if let Ok(c) = self.client.cache.lock() {
+                    if let Some(cached_resp) = c.get(&cache_key) {
+                        debug!("Returning cached response for query");
+                        return Ok(cached_resp.clone());
+                    }
                 }
             }
             if let Some(cache) = &self.client.persistent_cache {
-                match cache.get(&cache_key) {
+                match cache.get_with_max_age(&cache_key, self.client.cache_ttl) {
                     Ok(Some(cached_resp)) => {
                         debug!(cache_path = ?cache.path(), "Returning persistent cached response for query");
                         if let Ok(mut c) = self.client.cache.lock() {
@@ -649,6 +1122,12 @@ impl QueryBuilder {
                     Err(err) => warn!(error = ?err, "Failed to read persistent cache"),
                 }
             }
+        }
+
+        if self.client.offline {
+            return Err(anyhow::anyhow!(
+                "offline mode has no usable cached response for this query"
+            ));
         }
 
         let safe_params: Vec<_> = query_params
@@ -678,8 +1157,18 @@ impl QueryBuilder {
                 Ok(resp) => {
                     let status = resp.status();
                     if status.is_success() {
-                        match resp.json::<SearchResponse>().await {
-                            Ok(parsed) => break parsed,
+                        match resp.bytes().await {
+                            Ok(payload) => match decode_search_response(
+                                response_format(&self.client.base_url)?,
+                                &payload,
+                            ) {
+                                Ok(parsed) => break parsed,
+                                Err(e) => {
+                                    if attempt >= max_retries {
+                                        return Err(anyhow::Error::new(DnzError::Decode).context(e));
+                                    }
+                                }
+                            },
                             Err(e) => {
                                 if attempt >= max_retries {
                                     return Err(anyhow::Error::new(DnzError::Decode).context(e));
@@ -718,8 +1207,17 @@ impl QueryBuilder {
                 c.insert(cache_key.clone(), response.clone());
             }
             if let Some(cache) = &self.client.persistent_cache {
-                if let Err(err) = cache.put(&cache_key, &response) {
+                let provenance = CacheProvenance {
+                    source_url: self.client.base_url.clone(),
+                    auth_namespace: self.client.auth_cache_namespace(),
+                };
+                if let Err(err) = cache.put_with_provenance(&cache_key, &response, &provenance) {
                     warn!(error = ?err, "Failed to write persistent cache");
+                }
+                if let Some(limit) = self.client.cache_max_entries {
+                    if let Err(err) = cache.prune_to_limit(limit) {
+                        warn!(error = ?err, "Failed to enforce persistent cache limit");
+                    }
                 }
             }
         }
@@ -749,6 +1247,116 @@ fn retry_after_delay(headers: &reqwest::header::HeaderMap) -> Option<Duration> {
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.trim().parse::<u64>().ok())
         .map(|seconds| Duration::from_secs(seconds.min(60)))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResponseFormat {
+    Json,
+    Xml,
+    Rss,
+}
+
+fn response_format(base_url: &str) -> anyhow::Result<ResponseFormat> {
+    let url = reqwest::Url::parse(base_url)?;
+    let format = url
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .and_then(|segment| segment.rsplit_once('.').map(|(_, format)| format))
+        .unwrap_or("json");
+    match format {
+        "json" => Ok(ResponseFormat::Json),
+        "xml" => Ok(ResponseFormat::Xml),
+        "rss" => Ok(ResponseFormat::Rss),
+        other => Err(anyhow::Error::new(DnzError::UnsupportedFormat {
+            format: other.to_string(),
+        })),
+    }
+}
+
+fn decode_search_response(format: ResponseFormat, body: &[u8]) -> anyhow::Result<SearchResponse> {
+    match format {
+        ResponseFormat::Rss => normalize_rss_search_response(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
+        ResponseFormat::Json => serde_json::from_slice(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error))
+            .and_then(normalize_search_response)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
+        ResponseFormat::Xml => normalize_xml_search_response(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
+    }
+}
+
+fn decode_record_response(format: ResponseFormat, body: &[u8]) -> anyhow::Result<Record> {
+    match format {
+        ResponseFormat::Rss => normalize_rss_record_response(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
+        ResponseFormat::Json => serde_json::from_slice(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error))
+            .and_then(normalize_record_response)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
+        ResponseFormat::Xml => normalize_xml_record_response(body)
+            .map_err(|error| anyhow::Error::new(DnzError::Decode).context(error)),
+    }
+}
+
+fn record_endpoint_url(base_url: &str, record_id: &str) -> anyhow::Result<String> {
+    let mut url = reqwest::Url::parse(base_url)?;
+    let mut segments: Vec<String> = url
+        .path_segments()
+        .map(|values| values.map(str::to_string).collect())
+        .unwrap_or_default();
+    let format = segments
+        .last()
+        .and_then(|segment| {
+            segment
+                .split_once('.')
+                .map(|(_, format)| format.to_string())
+        })
+        .filter(|format| matches!(format.as_str(), "json" | "xml" | "rss"))
+        .unwrap_or_else(|| "json".to_string());
+    if segments
+        .last()
+        .is_some_and(|segment| segment.starts_with("records.") || segment == "records")
+    {
+        segments.pop();
+    }
+    segments.push("records".to_string());
+    segments.push(format!("{record_id}.{format}"));
+
+    {
+        let mut path = url
+            .path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("DigitalNZ base URL cannot accept path segments"))?;
+        path.clear();
+        path.extend(segments.iter().map(String::as_str));
+    }
+    Ok(url.to_string())
+}
+
+fn more_like_this_endpoint_url(base_url: &str, record_id: &str) -> anyhow::Result<String> {
+    let record_url = record_endpoint_url(base_url, record_id)?;
+    let mut url = reqwest::Url::parse(&record_url)?;
+    let mut segments: Vec<String> = url
+        .path_segments()
+        .map(|values| values.map(str::to_string).collect())
+        .unwrap_or_default();
+    let record_segment = segments
+        .pop()
+        .ok_or_else(|| anyhow::anyhow!("DigitalNZ record URL has no record segment"))?;
+    let (record_id_segment, format) = record_segment
+        .split_once('.')
+        .map(|(record_id, format)| (record_id.to_string(), format.to_string()))
+        .unwrap_or((record_segment, "json".to_string()));
+    segments.push(record_id_segment);
+    segments.push(format!("more_like_this.{format}"));
+    {
+        let mut path = url
+            .path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("DigitalNZ base URL cannot accept path segments"))?;
+        path.clear();
+        path.extend(segments.iter().map(String::as_str));
+    }
+    Ok(url.to_string())
 }
 
 fn is_local_test_url(value: &str) -> bool {

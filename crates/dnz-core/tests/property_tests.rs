@@ -25,8 +25,8 @@ proptest! {
 
     #[test]
     fn test_proptest_limit_clamping(limit in 0..1000u32) {
-        let expected = limit.clamp(1, 100);
-        prop_assert!((1..=100).contains(&expected));
+        let expected = limit.min(100);
+        prop_assert!((0..=100).contains(&expected));
     }
 
     #[test]
@@ -48,9 +48,12 @@ proptest! {
             .filter(|title| !title.is_empty())
             .collect::<HashSet<_>>()
             .len();
+        let empty_title_records = titles.iter().filter(|title| title.trim().is_empty()).count();
 
         prop_assert!(deduped.len() <= records.len());
-        prop_assert_eq!(deduped.len(), unique_non_empty_titles);
+        // Records without titles remain distinct when their IDs are distinct;
+        // title-based deduplication only applies to non-empty titles.
+        prop_assert_eq!(deduped.len(), unique_non_empty_titles + empty_title_records);
     }
 }
 

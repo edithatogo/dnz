@@ -1,23 +1,139 @@
-schema_version: 1
-last_updated_utc: 2026-07-13T12:00:00Z
-repository_head: e28eb667100f906b796c1f9854fc376eead93542
+schema_version: 2
+last_updated_utc: 2026-08-10T12:08:05Z
+repository_head: 9bf730f41118d2c4c1c23f0b96d76337d0c9cadb
 branch: codex/dnz-modernisation
-active_track: T01
-active_slice: header-auth-cache-isolation-and-exact-zero-pagination
-status: in_progress
+
+# Canonical status is recorded here; definitions live in manifest.yaml.
+active_track: T11
+active_slice: external-registry-acceptance
+status: blocked
+
+track_status:
+  T00: complete
+  T01: complete
+  T02: complete
+  T03: complete
+  T04: complete
+  T05: complete
+  T06: complete
+  T07: complete
+  T08: complete
+  T09: complete
+  T10: complete
+  T11: blocked
+  T12: complete
+
 verified_gates:
   - cargo fmt --all -- --check
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (RSS fixture/client normalization gate)
+  - pixi lock (PASS; maturin provisioned for win-64, linux-64, and osx-64)
+  - cargo fmt --all -- --check and Python compatibility unit tests (3 passed; T05 thin adapter boundary)
+  - rustup run stable-x86_64-pc-windows-gnu cargo check -p dnz-python --all-features (PASS; T05 packaged facade/native bridge)
+  - .pixi/envs/default/python.exe -m unittest discover -s crates/dnz-python/python/tests -v (3 tests passed; T05 clean-room compatibility)
   - cargo metadata --no-deps --format-version 1
-completed_tracks: []
-blocked_tracks: []
+  - scripts/workspace-doctor.ps1 (GNU route, 50.39 GB free)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (57 unit, 4 integration, 5 property, 0 doctest failures)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (60 unit, 8 integration, 5 property, 0 doctest failures)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (61 unit, 8 integration, 5 property, 0 doctest failures)
+  - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS with repository .pixi Python)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --all-features (72 unit, 11 integration, 5 property, 0 doctest failures; T07 cache and harvest slices)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T07 harvest checkpoints)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --all-features (82 unit, 12 integration, 5 property, 0 doctest failures; T08 exports, provenance, quality, rights, and RO-Crate)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T08 CSV export)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T08 GeoJSON export)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T08 provenance)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T08 quality and rights)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T08 RO-Crate metadata)
+  - rustup run stable-x86_64-pc-windows-gnu cargo check -p dnz-core --features parquet (PASS; T08 optional Parquet export)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core --features parquet parquet::tests:: (PASS; 1 focused test; T08 Parquet artifact)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --features parquet --all-targets -- -D warnings (PASS; T08 Parquet feature)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core sqlite_export_is_queryable_and_records_schema_metadata (PASS; T08 SQLite export)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core evidence_pack_preserves_source_and_distinguishes_api_mlt (PASS; T09 evidence pack)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T09 evidence pack and research indexes)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core evidence::tests:: (PASS; T09 CSL and Markdown evidence outputs)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-core research::tests:: (PASS; T09 lexical/vector/hybrid provenance)
+  - bundled Pixi Python scripts/check_openapi_drift.py (PASS; T10 offline contract report)
+  - bundled Pixi Python scripts/verify-release-archives.py (PASS; T10 required files and SHA-256 manifest)
+  - bundled Pixi Python scripts/create-release-archive.py plus ZIP inspection (PASS; T10 archive contents)
+  - pwsh scripts/live-digitalnz-smoke.ps1 (PASS; intentional non-live skip without -RunLive)
+  - bundled PyYAML workflow parsing for ci.yml, hardening.yml, and release.yml (PASS; T10 workflow syntax)
+  - cargo test --workspace --all-features (PASS after quick-xml 0.41 and dependency refresh)
+  - cargo clippy --workspace --all-targets --all-features -- -D warnings (PASS after quick-xml 0.41 and dependency refresh)
+  - cargo test --workspace --all-features (PASS in fresh target after Arrow/Parquet and atomic export changes; 89 core unit, 12 integration, 5 property, 7 MCP, adapter and doctest groups)
+  - cargo clippy --workspace --all-targets --all-features -- -D warnings (PASS in fresh target after Arrow/Parquet and atomic export changes)
+  - cargo fmt --all -- --check (PASS after quick-xml 0.41 XML compatibility fix)
+  - cargo audit (PASS; object_store/quick-xml vulnerable path removed; one allowed unmaintained paste warning remains through Parquet)
+  - cargo bench -p dnz-core --bench benchmarks (PASS; dataframe median 120.2 us, record parsing median 799.8 ns)
+  - cargo test -p dnz-core --all-features parquet (PASS; 2 Parquet artifact/readback and atomic-replacement tests)
+  - pixi install --locked and pixi run package-metadata (PASS after MSRV/dependency metadata update)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS; T07 incremental sync manifest)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-mcp --all-features (7 tests passed; T04 MCP record/MLT parity)
+  - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS after T04 MCP parity)
+  - rustup run stable-x86_64-pc-windows-gnu cargo check -p dnz-python --all-features (PASS; T04 Python record/MLT parity)
+  - rustup run stable-x86_64-pc-windows-gnu cargo clippy -p dnz-python --all-targets --all-features -- -D warnings (PASS; T04 Python parity)
+  - cargo fmt --all -- --check (PASS after T04 Python parity)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (68 unit, 9 integration, 5 property, 0 doctest failures; T03 XML)
+  - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS after T03 XML)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (63 unit, 8 integration, 5 property, 0 doctest failures; T06 vector semantics)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (64 unit, 8 integration, 5 property, 0 doctest failures; T06 secure model downloads)
+  - rustup run stable-x86_64-pc-windows-gnu cargo test -p dnz-python --all-features (PASS; 0 tests, bundled Pixi DLL paths)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (64 unit, 8 integration, 5 property, 0 doctest failures; T06 truthful schema metadata)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features (65 unit, 8 integration, 5 property, 0 doctest failures; T06 export reconciliation)
+  - cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets --all-features -- -D warnings (PASS with repository .pixi Python)
+  - GitHub Actions hardening run 29449278829 (PASS; Rust workspace including GeoParquet tests/bench, MSRV 1.94, OpenAPI, container, package, cargo audit/deny, Gitleaks, and SPDX SBOM; live smoke intentionally skipped)
+  - cargo +stable-x86_64-pc-windows-gnu test -p dnz-core --all-features parquet (PASS; 3 Parquet/GeoParquet tests including WKB metadata and invalid-coordinate omission)
+  - cargo +stable-x86_64-pc-windows-gnu clippy -p dnz-core --all-targets --all-features -- -D warnings (PASS after GeoParquet implementation)
+completed_tracks:
+  - T00
+  - T01
+  - T02
+  - T03
+  - T04
+  - T05
+  - T06
+  - T07
+  - T08
+  - T09
+  - T10
+blocked_tracks: [T11]
+in_progress_tracks: []
 deferred_tracks: []
 latest_evidence:
   - conductor/evidence/2026-07-13-baseline.md
   - conductor/evidence/2026-07-13-t01-t06-slice.md
-latest_handoff: conductor/handoff.md
+  - conductor/evidence/2026-07-14-t01-t02-executable-gate.md
+  - conductor/evidence/2026-07-14-t03-endpoints-models.md
+  - conductor/evidence/2026-07-14-t04-cli-parity.md
+  - conductor/evidence/2026-07-14-t04-mcp-parity.md
+  - conductor/evidence/2026-07-14-t04-python-parity.md
+  - conductor/evidence/2026-07-14-t05-pydnz-compatibility.md
+  - conductor/evidence/2026-07-15-t07-page-stream.md
+  - conductor/evidence/2026-07-15-t08-export-jsonl.md
+  - conductor/evidence/2026-07-15-t09-evidence-pack.md
+  - conductor/evidence/2026-07-16-t10-hardening.md
+  - conductor/evidence/2026-08-02-t11-t12-inventory.md
+latest_handoff: conductor/evidence/2026-08-02-t11-t12-inventory.md
 notes:
-  - Workspace test/clippy/build gates are environment-blocked by the PATH Git POSIX linker; preserve this as an external blocker until an MSVC/Windows SDK toolchain is available.
-  - T01 structured errors, Retry-After, timeout, auth-mode isolation, endpoint checks, and redacted transport diagnostics are implemented; focused runtime tests and full gates remain.
-  - T02 has validated bbox, facet exclusion, facet bounds, and protected extra parameters; nested boolean filters and full contract tests remain.
-  - T06 dense harvest truncation is removed; export/vector/Python correctness items remain.
-  - The branch advanced concurrently with commits 488cfe1 and ede3f99; both were preserved and not rewritten.
+  - manifest.yaml is the sole source for T00-T10 definitions, priorities, dependencies, and acceptance criteria.
+  - state.yaml is the sole source for current status, blockers, verification, and handoff state.
+  - The legacy tracks.md is now a compatibility index and must not contain independent track statuses.
+  - T01 transport/auth/cache/error acceptance is verified by the executable core gate and is complete.
+  - T02 query-contract acceptance is verified by the executable serializer/integration/property gate and is complete.
+  - T03 record/MLT builders, tolerant JSON/XML/RSS response normalization, typed common fields, integer/string IDs, unknown-field preservation, structured pagination/request metadata, and broad structured error coverage are verified; live RSS HTTP 500 is an external follow-up.
+  - T04 CLI, MCP, and Python raw/typed record/More Like This builder parity and migration notes are verified; optional async ergonomics is deferred.
+  - T05 clean-room dnz.api facade, compatibility tests, GNU wheel build, and isolated wheel import verification are complete; broader optional behavioral combinations remain future hardening.
+  - T07 bounded page/record streams, cache lifecycle, resumable/rate-controlled harvest, recursive density planning, and deterministic incremental sync manifests are verified; T07 is complete.
+  - T08 deterministic atomic JSONL, CSV, validated GeoJSON, optional Parquet, SQLite, provenance/checksum metadata, data-quality metrics, rights/reuse audits, and source-grounded Frictionless/schema.org/RO-Crate metadata are verified and complete.
+  - T09 evidence packs preserve source links, rights metadata, stable citation keys, CSL-compatible references, Markdown output, and explicit API-MLT/lexical/local-vector/hybrid provenance; T09 is complete.
+  - T10 hardening scripts and workflows are implemented; local and hosted GitHub gates pass. The opt-in live DigitalNZ smoke remains intentionally skipped.
+  - T10 audit is locally green after optional exports moved to polars-core plus Arrow/Parquet; one allowed unmaintained paste warning remains and is reported explicitly.
+  - T06 dense harvest truncation was removed; vector-store dimension/upsert, secure model-download, Python runtime lifecycle, truthful schema metadata, export publication, and manifest/file reconciliation are verified.
+  - Existing user and concurrent work remains unmodified and unstaged; repository_head records the latest known committed baseline, while uncommitted work is preserved in the worktree.
+  - T11/T12 are post-roadmap GitHub follow-up tracks. T11 external DOI publication and registry acceptance remain blocked until the respective service accepts the submission; T12 repository rulesets, Renovate/Codecov onboarding, and hosted settings remain external approval gates.
+  - T11 local registry inventory, Croissant metadata, rights/provenance card, and offline validator pass; DOI minting and Hugging Face publication/acceptance remain blocked external actions.
+  - T12 local workflow references are pinned to immutable upstream action commits, strict offline workflow policy validation passes, maintainer/security/contribution context exists, and a bounded mutation lane is opt-in; hosted rulesets, Renovate app access, and Codecov onboarding remain external.
+  - The bounded mutation lane was attempted twice and could not complete the unmutated workspace baseline within the local window; no mutation score is claimed. CI or a host with a working complete GNU/MSVC toolchain is required.
+  - RNZ monthly Zenodo run 30687409986 failed because the publish job did not hydrate the digitalnz submodule; the local workflow now uses recursive submodule checkout and an explicit metadata presence check. Hosted confirmation remains gated on commit/push.
+  - Hosted hardening run 30755301583 passed for commit 13ad4a3c: Rust, MSRV, OpenAPI drift, container smoke, audit/licenses/secrets/SBOM, and Python/MCP/package checks all passed; opt-in live API smoke remained skipped.
+  - T12 hosted run 30773596219 passed for commit 4608cd27: bounded mutation, workflow policy, registry metadata, Rust, MSRV, OpenAPI, container, security, packaging, and adapter checks all passed; live API smoke remained skipped. T12 is complete.
+  - T11 metadata-only Hugging Face publication to edithatogo/digitalnz is verified for three registry files; Dataset Viewer Croissant acceptance returned 404 and is not claimed. T11 remains blocked on DOI minting and DigitalNZ/provider acceptance.

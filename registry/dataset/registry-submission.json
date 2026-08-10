@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "dataset": {
+    "id": "edithatogo/digitalnz",
+    "name": "DigitalNZ source archive and integration evidence",
+    "description": "Source-grounded software, notebooks, metadata inventories, and evidence for the dnz DigitalNZ v3 integration hub.",
+    "repository": "https://github.com/edithatogo/dnz",
+    "license": "MIT",
+    "provider_rights": "Provider and item rights remain those stated by the originating DigitalNZ collection; this archive does not grant downstream reuse rights.",
+    "language": ["en"],
+    "keywords": ["DigitalNZ", "New Zealand", "metadata", "open data", "source archive"],
+    "sources": [
+      {
+        "title": "DigitalNZ Developers",
+        "url": "https://digitalnz.org/developers",
+        "role": "official_api_documentation"
+      },
+      {
+        "title": "dnz source archive card",
+        "path": "SOURCE_ARCHIVE_CARD.md",
+        "role": "archive_scope"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "target": "huggingface_dataset",
+      "repository": "edithatogo/digitalnz",
+      "status": "ready_for_authenticated_submission",
+      "metadata": "registry/dataset/croissant.json",
+      "card": "registry/dataset/dataset-card.md",
+      "external_gate": "Hugging Face acceptance and publication are not asserted by this repository."
+    },
+    {
+      "target": "doi",
+      "status": "submission_package_ready",
+      "metadata": "registry/dataset/registry-submission.json",
+      "external_gate": "DOI provider selection, submission, and identifier minting require maintainer action."
+    }
+  ],
+  "validation": {
+    "command": "python scripts/validate-registry-metadata.py",
+    "offline": true,
+    "credentials_required": false
+  }
+}
