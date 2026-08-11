@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "source": "digitalnz/facets/rights.csv",
+  "scope": "aggregate rights statements and record counts only; no underlying DigitalNZ objects or provider payloads",
+  "approved_public_categories": [
+    "cc_by_attribution_only",
+    "cc_by_nc",
+    "cc_by_nc_nd",
+    "cc_by_nc_sa",
+    "cc_by_sa",
+    "other_open_or_conditional",
+    "public_domain_or_no_known_restrictions"
+  ],
+  "review_categories": [
+    "copyright_reserved_or_all_rights_reserved",
+    "permission_required_or_explicit_restriction",
+    "unresolved_some_rights_reserved_or_other"
+  ],
+  "record_counts": {
+    "cc_by_attribution_only": 952476,
+    "cc_by_nc": 619159,
+    "cc_by_nc_nd": 255336,
+    "cc_by_nc_sa": 66244,
+    "cc_by_sa": 59419,
+    "copyright_reserved_or_all_rights_reserved": 2680413,
+    "other_open_or_conditional": 104843,
+    "permission_required_or_explicit_restriction": 188443,
+    "public_domain_or_no_known_restrictions": 21517943,
+    "unresolved_some_rights_reserved_or_other": 3534141
+  },
+  "total_records": 29978417
+}

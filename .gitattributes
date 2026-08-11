@@ -1,0 +1,3 @@
+# Rights statements are archival source values and may contain significant
+# whitespace within multiline fields.
+registry/dataset/public-rights-archive/*.csv -whitespace
