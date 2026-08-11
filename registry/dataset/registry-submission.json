@@ -33,9 +33,11 @@
     },
     {
       "target": "doi",
-      "status": "submission_package_ready",
+      "status": "published",
+      "identifier": "https://doi.org/10.5281/zenodo.21885916",
+      "record": "https://zenodo.org/records/21885916",
       "metadata": "registry/dataset/registry-submission.json",
-      "external_gate": "DOI provider selection, submission, and identifier minting require maintainer action."
+      "external_gate": "DOI publication is verified; DigitalNZ/provider acceptance remains external."
     }
   ],
   "validation": {
