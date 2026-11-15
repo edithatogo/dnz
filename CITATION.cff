@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: If you use this work, please cite it using these metadata and identify the
+  commit or release used.
+title: DigitalNZ Integration Hub (Rust Core)
+authors:
+- name: DigitalNZ Integration Hub contributors
+repository-code: https://github.com/edithatogo/dnz
+url: https://github.com/edithatogo/dnz
